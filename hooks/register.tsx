@@ -40,12 +40,14 @@ export const register: Register = on => {
       await $.ui.open({ id: CONFIG_PANE_ID, title: S.settingsTitle, focus: true, closeOnEscape: true })
       return { text: S.settingsOpened }
     }
-    // Bare /sst: the pane, open or closed.
-    if ((await $.ui.panes()).some(p => p.id === PANE_ID)) {
+    // Bare /sst: the pane, closed if in view; else opened, or brought forward from behind another
+    // tab (an open id only retitles without focus).
+    const pane = (await $.ui.panes()).find(p => p.id === PANE_ID)
+    if (pane?.isShown && pane.isPlaced) {
       await $.ui.close({ id: PANE_ID })
       return { text: S.paneClosed }
     }
-    await $.ui.open({ id: PANE_ID, title: S.paneTitle })
+    await $.ui.open({ id: PANE_ID, title: S.paneTitle, ...(pane ? { focus: true } : {}) })
     return { text: S.paneOpened }
   })
 }

@@ -8,6 +8,8 @@ export type FakeEngine = {
   model: string
   turns: number
   openPanes: Set<string>
+  /** Open panes that are a tab behind another (isShown false), until opened with focus. */
+  hiddenPanes: Set<string>
   commands: string[]
   commandSpecs: { name: string; immediate?: true }[]
   clock: MockClock
@@ -26,6 +28,7 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     model: 'Opus 5.5',
     turns: 0,
     openPanes: new Set(),
+    hiddenPanes: new Set(),
     commands: [],
     commandSpecs: [],
     clock: mock.clock(on),
@@ -40,10 +43,14 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
   on('session.usage', (_$, e) => (fake.usageCalls.push(e), { value: fake.usage }))
   on('session.model', () => ({ value: fake.model }))
   on('session.turns', () => ({ value: fake.turns }))
-  on('ui.open', (_$, e) => (fake.openPanes.add(e.id), { value: { isPlaced: true } }))
-  on('ui.close', (_$, e) => (fake.openPanes.delete(e.id), { value: undefined }))
+  on('ui.open', (_$, e) => {
+    fake.openPanes.add(e.id)
+    if (e.focus) fake.hiddenPanes.delete(e.id)
+    return { value: { isPlaced: true } }
+  })
+  on('ui.close', (_$, e) => (fake.openPanes.delete(e.id), fake.hiddenPanes.delete(e.id), { value: undefined }))
   on('ui.panes', () => ({
-    value: [...fake.openPanes].map(id => ({ id, title: id, isShown: true, isFocused: false, isPlaced: true })) as never,
+    value: [...fake.openPanes].map(id => ({ id, title: id, isShown: !fake.hiddenPanes.has(id), isFocused: false, isPlaced: true })) as never,
   }))
   return fake
 }

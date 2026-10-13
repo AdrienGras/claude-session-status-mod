@@ -55,3 +55,14 @@ test('/sst toggles the pane', async ($, on) => {
   await $.command.run(typed('sst'))
   expect(fake.openPanes.has('sst')).toBe(false)
 })
+
+test('/sst brings back a pane hidden behind another tab instead of closing it', async ($, on) => {
+  const fake = fakeEngine(on)
+  await startSession($)
+  await $.command.run(typed('sst'))
+  fake.hiddenPanes.add('sst')
+  const out = (await $.command.run(typed('sst'))) as { text: string }
+  expect(out.text).toBe('Session pane opened.')
+  expect(fake.openPanes.has('sst')).toBe(true)
+  expect(fake.hiddenPanes.has('sst')).toBe(false)
+})
