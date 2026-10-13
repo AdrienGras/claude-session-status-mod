@@ -5,6 +5,7 @@ import { atom, read } from 'claude-code'
 
 import { cellWidth } from './cells'
 import { minibarLine, minibarRow } from './minibar-rows'
+import { PANE_ID } from './pane'
 import { normalizeSettings } from './settings'
 import { EMPTY_LIVE, INITIAL_SETTINGS } from './state'
 import { S } from './strings'
@@ -39,7 +40,7 @@ export const registerMinibar = (on: On): void => {
           ))}
         </Text>
         <Text> </Text>
-        <Button key="open" label={S.openPane} plain onPress={() => $.ui.open({ id: 'sst', title: S.paneTitle })} />
+        <Button key="open" label={S.openPane} plain onPress={() => $.ui.open({ id: PANE_ID, title: S.paneTitle })} />
       </Box>
     )
 

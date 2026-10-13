@@ -11,7 +11,6 @@ import type { CardLine, GitSnapshot, Live, RateLimit, Settings, UsageView } from
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const SEP: Part = { text: ' │ ', color: 'subtle' }
-const WINDOW_LABEL: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 
 export type MinibarInput = { usage: UsageView | null; live: Live; git: GitSnapshot | null; settings: Settings; now: number }
 
@@ -30,17 +29,17 @@ const model = (live: Live): Part[] | null => {
 const context = (usage: UsageView, w: number): Part[] => {
   const figure = contextFigure(usage)
   const label = contextLabel(figure.tokens, usage.window, figure.isEstimate)
-  if (label.pct === null) return [{ text: `ctx ${S.ctxPending}`, dim: true }]
+  if (label.pct === null) return [{ text: `${S.ctx} ${S.ctxPending}`, dim: true }]
   const tone = figure.isEstimate ? 'inactive' : contextTone(label.pct)
   const bar = usage.breakdown
     ? segmentBar(toSegments(usage.breakdown, figure.tokens, usage.window), usage.window, w)
     : lineBar(label.pct / 100, w, tone)
-  return [{ text: 'ctx ', dim: true }, ...cellsToParts(bar), { text: ` ${figure.isEstimate ? '≈' : ''}${label.pct}%`, color: tone }]
+  return [{ text: `${S.ctx} `, dim: true }, ...cellsToParts(bar), { text: ` ${figure.isEstimate ? '≈' : ''}${label.pct}%`, color: tone }]
 }
 
 /** `5h ━━──┊──── 20% → 40% ✓`: the verdict as its glyph alone; a plain gauge without a reset time. */
 const quota = (r: RateLimit, w: number, now: number): Part[] => {
-  const label: Part = { text: `${WINDOW_LABEL[r.kind] ?? r.kind} `, dim: true }
+  const label: Part = { text: `${S.windowLabel[r.kind] ?? r.kind} `, dim: true }
   const used = `${Math.round(r.percentUsed)}%`
   const burn = readQuota(r, now)
   if (burn === 'stale') return [label, { text: '—', dim: true }]

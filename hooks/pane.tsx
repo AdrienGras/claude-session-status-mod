@@ -6,6 +6,7 @@ import type { Part } from './parts'
 import { toBreakdownView } from './context'
 import { paneRows } from './pane-rows'
 import { normalizeSettings } from './settings'
+import { CONFIG_PANE_ID } from './settings-view'
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import { S } from './strings'
 import type { GitSnapshot, Receipt, UsageView } from '../types'
@@ -83,7 +84,7 @@ export const registerPane = (on: On): void => {
             key="settings"
             label={S.actionSettings}
             hotkey="s"
-            onPress={() => $.ui.open({ id: 'sst-config', title: S.settingsTitle, focus: true, closeOnEscape: true })}
+            onPress={() => $.ui.open({ id: CONFIG_PANE_ID, title: S.settingsTitle, focus: true, closeOnEscape: true })}
           />
         </Box>
       </Box>

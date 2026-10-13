@@ -131,7 +131,7 @@ const header = ({ usage, live }: PaneInput): Section => {
   const facts = [live.permissionMode ? `${S.mode} ${live.permissionMode}` : null, `${live.requests} ${S.req}`].filter(Boolean).join(' · ')
   rows.push({ left: live.effort ? effortGauge(live.effort) : [], right: [dim(facts)] })
   const speed = live.speed
-    ? `ttft ${(live.speed.ttftMs / 1000).toFixed(1)}s${live.speed.tokPerS === null ? '' : ` · ${Math.round(live.speed.tokPerS)} tok/s`}`
+    ? `${S.ttft} ${(live.speed.ttftMs / 1000).toFixed(1)}s${live.speed.tokPerS === null ? '' : ` · ${Math.round(live.speed.tokPerS)} ${S.tokPerS}`}`
     : ''
   if (speed || usage) rows.push({ left: [dim(speed)], right: usage ? [dim(`${S.window} ${fmtTokens(usage.window)}`)] : [] })
   const title: Part = { text: live.model ? prettyModel(live.model) : S.model, color: 'claude', bold: true }
@@ -170,7 +170,7 @@ const context = (usage: UsageView, columns: number): Section => {
     const item = (name: string, tokens: number): Row => ({ left: [{ text: `  ${name}` }], right: [dim(fmtTokens(tokens))] })
     groups.push(
       { key: 'memory', summary: `${S.memory} ${b.memoryFiles.length} · ${sum(b.memoryFiles)}`, items: b.memoryFiles.map(f => item(tail(f.path, inner - 10), f.tokens)) },
-      { key: 'mcp', summary: `MCP ${servers.length} · ${sum(b.mcpTools)}`, items: servers.map(s => item(`${s.server} (${s.count})`, s.tokens)) },
+      { key: 'mcp', summary: `${S.mcp} ${servers.length} · ${sum(b.mcpTools)}`, items: servers.map(s => item(`${s.server} (${s.count})`, s.tokens)) },
       {
         key: 'skills',
         summary: `${S.skills} ${b.skills?.totalSkills ?? 0} · ${fmtTokens(b.skills?.tokens ?? 0)}`,
@@ -193,7 +193,7 @@ const context = (usage: UsageView, columns: number): Section => {
 
 const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
   const when = (at: number) => `${S.resets} ${fmtWhen(at, now)}`
-  const label = dim(`${r.kind === 'five_hour' ? '5h' : r.kind === 'seven_day' ? '7d' : r.kind} `)
+  const label = dim(`${S.windowLabel[r.kind] ?? r.kind} `)
   const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
   const burn = readQuota(r, now)
   if (burn === 'stale') return [{ left: [label, dim('—')] }, { left: [dim(`   ${S.quotaReset}`)] }]
