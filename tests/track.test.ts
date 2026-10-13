@@ -76,3 +76,21 @@ test('a denied or failed edit is an error, not an edit', async ($, on) => {
   expect(mod.receipt?.edits).toBe(0)
   expect(mod.receipt?.errors).toBe(2)
 })
+
+test('after a compaction between turns, the old fill goes at once', async ($, on) => {
+  const fake = fakeEngine(on, { context: { tokens: 850_000, window: 1_000_000, percent: 85 } })
+  on('session.compact', (_$, e) => ({ messages: e.messages }))
+  await startSession($)
+  await fake.clock.settle()
+  const hint = { plugin: 'session-status', component: 'PromptHint' as const, props: { isDraft: false, isWorking: false, hint: '?' }, surface: 'terminal' as const }
+  const before = await $.ui.mount(hint)
+  expect(await before.find({ text: /85%/ })).toBeDefined()
+  await before.unmount()
+  // The engine has no fill until the next response after a compaction.
+  fake.usage = { ...fake.usage, context: { window: 1_000_000 } as never }
+  await $.session.compact({ trigger: 'manual', messages: [{ role: 'user', text: 'x', toolUses: [] }] } as never)
+  await fake.clock.settle()
+  const after = await $.ui.mount(hint)
+  expect(await after.find({ text: /85%/ })).toBeUndefined()
+  await after.unmount()
+})

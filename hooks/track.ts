@@ -186,7 +186,12 @@ export const registerTracking = (on: On): void => {
     const r = await next(e)
     // A precompute installs nothing, a subagent compacts its own transcript, a skip compacts nothing.
     const isCompaction = e.trigger !== 'precompute' && !e.agentId && r.messages !== undefined
-    if (isCompaction) await update($, countersAtom, c => ({ ...c, compactions: c.compactions + 1 }))
+    if (isCompaction) {
+      await update($, countersAtom, c => ({ ...c, compactions: c.compactions + 1 }))
+      // The fill and breakdown were the old transcript's; between turns no measure follows to replace them.
+      await update($, usageAtom, u => u && { ...u, tokens: undefined, breakdown: null })
+      refreshLater($)
+    }
     return r
   })
 
