@@ -43,6 +43,9 @@ let isCountReset = false
 /** How often the drawings are redrawn while nothing else moves: countdowns, the `┊` mark. */
 const REDRAW_MS = 30_000
 let redraw: { cancel: () => void } | null = null
+/** While a turn runs, its timer in the pane counts seconds. */
+const TICK_MS = 1_000
+let tick: { cancel: () => void } | null = null
 
 /** Re-read the session's figures; a new `startedAt` the mod did not see coming starts the counts over. */
 const refreshUsage = async ($: Dollar) => {
@@ -120,6 +123,8 @@ export const registerTracking = (on: On): void => {
     isCountReset = true
     await update($, countersAtom, () => emptyCounters(now))
     await update($, receiptAtom, () => null)
+    tick?.cancel()
+    tick = null
     await update($, liveAtom, l => ({ ...l, requests: 0, speed: null, isWorking: false }))
     // The old conversation's fill and cost no longer hold; the next figures bring the new ones.
     await update($, usageAtom, u => u && { ...u, tokens: undefined, costUsd: undefined, prompts: 0, breakdown: null })
@@ -173,12 +178,16 @@ export const registerTracking = (on: On): void => {
     costAtTurnStart = (await read($, usageAtom))?.costUsd
     await update($, liveAtom, l => ({ ...l, isWorking: true }))
     await update($, receiptAtom, () => ({ isRunning: true, startedAt: now, durationMs: null, agents: 0, edits: 0, errors: 0, costAddedUsd: null }))
+    tick?.cancel()
+    tick = $.clock.every(TICK_MS, () => $.ui.invalidate('ui.render'))
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
     if (e.agentId) return r
+    tick?.cancel()
+    tick = null
     const now = await $.clock.now()
     await update($, liveAtom, l => ({ ...l, isWorking: false }))
     await update($, receiptAtom, rc => rc && { ...rc, isRunning: false, durationMs: now - rc.startedAt })

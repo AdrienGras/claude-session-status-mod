@@ -153,3 +153,20 @@ test('a measure is handed back before the figures are re-read', async ($, on) =>
   await fake.clock.settle()
   expect(fake.usageCalls.length).toBe(calls + 1)
 })
+
+test('while a turn runs, the drawings tick every second; after it, they rest', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  let redraws = 0
+  on('ui.invalidate', () => ((redraws += 1), { value: undefined }))
+  await startSession($)
+  await fake.clock.settle()
+  redraws = 0
+  await $.turn.start({ text: 'go', turnId: 'T1' })
+  await fake.clock.advance(5_000)
+  expect(redraws >= 4).toBe(true)
+  await $.turn.complete({ turnId: 'T1', reason: 'end_turn', answer: '', text: '', isAborted: false } as never)
+  redraws = 0
+  await fake.clock.advance(5_000)
+  expect(redraws).toBe(0)
+})
