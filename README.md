@@ -1,5 +1,6 @@
 # 📟 session-status
 
+[![CI](https://github.com/AdrienGras/claude-session-status-mod/actions/workflows/ci.yml/badge.svg)](https://github.com/AdrienGras/claude-session-status-mod/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/github/v/tag/AdrienGras/claude-session-status-mod?label=version&sort=semver)](https://github.com/AdrienGras/claude-session-status-mod/tags)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code 2.1.296](https://img.shields.io/badge/Claude%20Code-2.1.296%20mod-d97757.svg)](https://claude.com/blog/claude-code-mods)
@@ -84,15 +85,14 @@ The mod reads Claude Code's session data and runs `git` in your project for the 
 ```sh
 git clone https://github.com/AdrienGras/claude-session-status-mod
 cd claude-session-status-mod
-claude plugin validate .
-claude plugin test .
 claude --plugin-dir .
+claude plugin validate --strict . && claude plugin test .
 ```
 
 The pure logic (formatting, burn rate, bars, context, git parsing, status line and pane rows) lives in `hooks/*.ts` and is unit-tested; the `*.tsx` files only draw. Every displayed string is in `hooks/strings.ts`. The demo above is recorded with `docs/media/record.sh`.
 
-Mods are an early-access Claude Code feature: the API may change between releases. Found something off? [Open an issue](https://github.com/AdrienGras/claude-session-status-mod/issues) with your `/sst debug` output. 🙌
+Mods are an early-access Claude Code feature: the API may change between releases. Found something off? [Open an issue](https://github.com/AdrienGras/claude-session-status-mod/issues/new/choose) with your `/sst debug` output, in English or French. 🙌 Want to send a fix? See [CONTRIBUTING.md](CONTRIBUTING.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## 📄 License
 
-MIT
+[MIT](LICENSE)

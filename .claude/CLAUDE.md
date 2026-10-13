@@ -9,10 +9,10 @@ A Claude Code mod (hooks module, mod API of Claude Code 2.1.296): a status line 
 ## Check before every commit
 
 ```sh
-claude plugin validate . && npx -y -p typescript@5 tsc -p . && claude plugin test .
+claude plugin validate --strict . && npx -y -p typescript@5 tsc -p . && claude plugin test .
 ```
 
-`tsc -p .` works once Claude Code has loaded the mod from this folder (it lays `.claude-plugin/types/`, git-ignored). On a fresh clone, run `claude --plugin-dir .` once first.
+`tsc -p .` works once Claude Code has loaded the mod from this folder (it lays `.claude-plugin/types/`, git-ignored). On a fresh clone, run `claude --plugin-dir .` once first. CI (`.github/workflows/ci.yml`) runs `validate --strict` and the tests on Claude Code 2.1.296, without `tsc` (no logged-in session there); test workflows locally with `act`.
 
 TDD: write the test, watch it fail for the right reason, then the code.
 
@@ -65,4 +65,4 @@ Pure logic goes in `*.ts` with unit tests; `*.tsx` only draws.
 
 ## Release
 
-Bump `version` in `.claude-plugin/plugin.json`, merge to `main`, tag `vX.Y.Z`, push. Users update with `/plugin` → update, then `/reload-plugins`. Demo GIF: `docs/media/record.sh` (asciinema + agg), trim with `SELECT=event:a..event:b docs/media/record.sh --convert`.
+Move the *Unreleased* entries of `CHANGELOG.md` under the new version, bump `version` in `.claude-plugin/plugin.json` (and the Claude Code version in the README badge and `ci.yml` if it changes), merge to `main`, tag `vX.Y.Z`, push. `release.yml` checks the tag matches `plugin.json` and publishes the GitHub release from the changelog section. Users update with `/plugin` → update, then `/reload-plugins`. Demo GIF: `docs/media/record.sh` (asciinema + agg), trim with `SELECT=event:a..event:b docs/media/record.sh --convert`.
