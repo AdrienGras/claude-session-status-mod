@@ -88,11 +88,12 @@ const tail = (path: string, max: number) => {
 
 /** `╭─ Title ───────── aside ─╮`, exactly `columns` wide. */
 const frameTop = (title: Part[], aside: Part[], columns: number): Part[] => {
-  // `╭─ ` + title + ` ` + fill + (` ` + aside) + ` ─╮`
-  const asideWidth = aside.length ? len(aside) + 1 : 0
+  // `╭─ ` + title + ` ` + fill + (` ` + aside + ` `) + `─╮`
+  const asideWidth = aside.length ? len(aside) + 2 : 0
   const head = fitLine(title, Math.max(1, columns - 8 - asideWidth))
-  const fill = Math.max(1, columns - 7 - len(head) - asideWidth)
-  const row = [border('╭─ '), ...head, border(` ${'─'.repeat(fill)}`), ...(aside.length ? [{ text: ' ' }, ...aside] : []), border(' ─╮')]
+  const fill = Math.max(1, columns - 6 - len(head) - asideWidth)
+  const end = aside.length ? [{ text: ' ' }, ...aside, border(' ─╮')] : [border('─╮')]
+  const row = [border('╭─ '), ...head, border(` ${'─'.repeat(fill)}`), ...end]
   return len(row) === columns ? row : pad(row, columns)
 }
 
@@ -252,7 +253,10 @@ const repo = ({ git, columns }: PaneInput): Section | null => {
           dim(` · ${plural(git.files, S.file)}${git.ahead !== null && git.behind !== null ? ` · ↑${git.ahead} ↓${git.behind}` : ''}`),
         ]
       : []
-    rows.push({ left: git.repo ? [{ text: git.repo }] : [], right: diff })
+    const name: Part[] = git.repo ? [{ text: git.repo }] : []
+    // A long name would cut the diff: then each gets a row.
+    if (name.length && diff.length && len(name) + len(diff) + 1 > inner) rows.push({ left: name }, { left: [], right: diff })
+    else rows.push({ left: name, right: diff })
   }
   if (git.sessionFiles.length > 0) {
     rows.push({ left: [dim(`${S.thisSession}:`)] })

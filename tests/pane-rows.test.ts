@@ -144,3 +144,15 @@ test('a line too long is cut with an ellipsis', () => {
   expect(text(fitLine([{ text: 'abcdef' }, { text: 'ghij' }], 8))).toBe('abcdefg…')
   expect(text(fitLine([{ text: 'abc' }], 8))).toBe('abc')
 })
+
+test('a frame without a figure closes without a gap', () => {
+  const top = all(input()).find(r => r.startsWith('╭─ Quotas'))!
+  expect(top).not.toContain('─ ─')
+  expect(top.endsWith('──╮')).toBe(true)
+})
+
+test('a long repo name moves the diff to a row of its own, uncut', () => {
+  const t = box(input({ git: { ...input().git!, repo: 'AdrienGras/claude-session-status-mod' } }), 'Repo')!
+  expect(t).toContain('AdrienGras/claude-session-status-mod')
+  expect(t).toContain('+42 −7 · 3 files · ↑2 ↓0')
+})
