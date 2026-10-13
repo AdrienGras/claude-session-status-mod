@@ -34,7 +34,7 @@ const input = (over: Partial<PaneInput> = {}): PaneInput => ({
         { name: 'b', serverName: 'github', tokens: 100 },
       ],
       agents: [{ agentType: 'Explore', tokens: 90 }],
-      skills: { totalSkills: 3, tokens: 1_200 },
+      skills: { totalSkills: 3, tokens: 1_200, items: [{ name: 'review', tokens: 300 }, { name: 'deploy', tokens: 900 }] },
       autoCompactThreshold: 160_000,
       isAutoCompactEnabled: true,
       autocompactSource: 'model-default',
@@ -125,6 +125,17 @@ test('context lists unfold on demand, two to a row', () => {
   expect(rows.flatMap(r => (r.kind === 'groups' ? r.groups.map(g => g.key) : []))).toEqual(['memory', 'mcp', 'skills', 'agents'])
   expect(all(input()).join('\n')).toContain('▸ MCP 1 · 800')
   expect(all(input({ expanded: ['mcp'] })).join('\n')).toContain('github')
+})
+
+test('the skills list unfolds onto its skills, the biggest first', () => {
+  const t = all(input({ expanded: ['skills'] })).join('\n')
+  expect(t.indexOf('deploy') >= 0 && t.indexOf('deploy') < t.indexOf('review')).toBe(true)
+  const many = Array.from({ length: 14 }, (_, i) => ({ name: `skill-${i}`, tokens: 100 - i }))
+  const usage = input().usage!
+  const long = all(input({ expanded: ['skills'], usage: { ...usage, breakdown: { ...usage.breakdown!, skills: { totalSkills: 14, tokens: 1_309, items: many } } } })).join('\n')
+  expect(long).toContain('skill-9')
+  expect(long).not.toContain('skill-10')
+  expect(long).toContain('+4 more')
 })
 
 test('quotas: used, projection and verdict, then the reset; no box without windows', () => {

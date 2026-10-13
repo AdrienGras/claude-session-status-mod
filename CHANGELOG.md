@@ -29,7 +29,9 @@ All notable changes to this project are listed here. The format follows [Keep a 
 - Wide characters (`⛔`, CJK, emoji) no longer push rows past the pane's frame or the status line past its room; a long branch name keeps the Repo box's title and corner.
 - Two quick presses in `/sst config` both take effect.
 - An effort level with no notches shows in the status line as its word, as in the pane.
+- The *skills* list in the Context box unfolds onto its skills (the ten biggest), instead of nothing.
 - The 30 s redraw (countdowns, the `┊` mark) starts even when the first usage read fails.
+- The pane's turn timer counts seconds while a turn runs, instead of moving every 30 s.
 
 ### Security
 

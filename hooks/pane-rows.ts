@@ -166,11 +166,19 @@ const context = (usage: UsageView, columns: number): Section => {
     }
     const sum = (xs: { tokens: number }[]) => fmtTokens(xs.reduce((a, x) => a + x.tokens, 0))
     const servers = mcpByServer(b.mcpTools)
+    const skills = [...(b.skills?.items ?? [])].sort((x, y) => y.tokens - x.tokens)
     const item = (name: string, tokens: number): Row => ({ left: [{ text: `  ${name}` }], right: [dim(fmtTokens(tokens))] })
     groups.push(
       { key: 'memory', summary: `${S.memory} ${b.memoryFiles.length} · ${sum(b.memoryFiles)}`, items: b.memoryFiles.map(f => item(tail(f.path, inner - 10), f.tokens)) },
       { key: 'mcp', summary: `MCP ${servers.length} · ${sum(b.mcpTools)}`, items: servers.map(s => item(`${s.server} (${s.count})`, s.tokens)) },
-      { key: 'skills', summary: `${S.skills} ${b.skills?.totalSkills ?? 0} · ${fmtTokens(b.skills?.tokens ?? 0)}`, items: [] },
+      {
+        key: 'skills',
+        summary: `${S.skills} ${b.skills?.totalSkills ?? 0} · ${fmtTokens(b.skills?.tokens ?? 0)}`,
+        items: [
+          ...skills.slice(0, MAX_FILES).map(k => item(k.name, k.tokens)),
+          ...(skills.length > MAX_FILES ? [{ left: [dim(`  +${skills.length - MAX_FILES} ${S.more}`)] }] : []),
+        ],
+      },
       { key: 'agents', summary: `${S.agents} ${b.agents.length}`, items: b.agents.map(a => item(a.agentType, a.tokens)) },
     )
   }

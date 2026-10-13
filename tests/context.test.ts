@@ -74,3 +74,16 @@ test('deferred MCP tools are outside the window: left out of the breakdown', () 
   } as unknown as SessionContextBreakdown
   expect(toBreakdownView(b).mcpTools).toEqual([{ name: 'mcp__docs__read', serverName: 'docs', tokens: 1_000 }])
 })
+
+test('the skills keep their names and listing tokens, for the pane only', () => {
+  const b = {
+    categories: [],
+    memoryFiles: [],
+    mcpTools: [],
+    agents: [],
+    skills: { totalSkills: 1, includedSkills: 1, tokens: 120, skillFrontmatter: [{ name: 'review', source: 'userSettings', tokens: 120 }] },
+    gridRows: [],
+    isAutoCompactEnabled: true,
+  } as unknown as SessionContextBreakdown
+  expect(toBreakdownView(b).skills).toEqual({ totalSkills: 1, tokens: 120, items: [{ name: 'review', tokens: 120 }] })
+})

@@ -56,7 +56,7 @@ export type BreakdownView = {
   memoryFiles: { path: string; tokens: number }[]
   mcpTools: { name: string; serverName: string; tokens: number }[]
   agents: { agentType: string; tokens: number }[]
-  skills?: { totalSkills: number; tokens: number }
+  skills?: { totalSkills: number; tokens: number; items: { name: string; tokens: number }[] }
   autoCompactThreshold?: number
   isAutoCompactEnabled: boolean
   autocompactSource: string
