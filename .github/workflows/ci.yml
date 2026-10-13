@@ -21,8 +21,10 @@ jobs:
         with:
           node-version: lts/*
       - name: Install Claude Code
+        # No lifecycle scripts from the dependency tree: only Claude Code's own installer runs, by name.
         run: |
-          npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          npm install --global --ignore-scripts "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          node "$(npm root --global)/@anthropic-ai/claude-code/install.cjs"
           claude --version
       # No tsc here: the API's type declarations are only laid by a logged-in session.
       - name: Validate manifests and mod rules
