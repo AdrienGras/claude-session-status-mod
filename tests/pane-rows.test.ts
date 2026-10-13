@@ -254,6 +254,12 @@ test('agents: unfolded, the last calls; none yet, said so', () => {
   expect(unknown).not.toContain('ctx')
 })
 
+test('agents: an empty task leaves no dangling separator', () => {
+  const t = box(input({ agents: [card({ task: '' })] }), 'Agents')!
+  expect(t).toContain('▸ Explore')
+  expect(t).not.toContain('Explore ·')
+})
+
 test('agents: no subagent, no box', () => {
   expect(box(input(), 'Agents')).toBeUndefined()
 })

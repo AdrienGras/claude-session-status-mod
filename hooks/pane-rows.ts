@@ -307,7 +307,7 @@ const agents = ({ agents: cards, now, columns }: PaneInput): Section | null => {
     ].filter(Boolean)
     return {
       key: `agent:${c.id}`,
-      summary: `${c.type} · ${c.task}`,
+      summary: c.task === '' ? c.type : `${c.type} · ${c.task}`,
       isWide: true,
       right: [{ text: `${glyph} ${span}`, color }],
       under: [{ left: [dim(`  ${figures.join(' · ')}`)] }],

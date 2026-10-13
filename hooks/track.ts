@@ -70,11 +70,18 @@ const syncTick = async ($: Dollar) => {
 
 /** Ends the cards of agents the engine no longer reports running (a killed one raises no end). */
 const reconcileAgents = async ($: Dollar) => {
+  if (!(await read($, agentsAtom)).some(c => c.state === 'running')) return
   const listed = await $.agent.list().catch(() => null)
   if (!listed) return
   const now = await $.clock.now()
   await update($, agentsAtom, cs => keepCards(reconcile(cs, listed, now)))
   await syncTick($)
+}
+
+/** Changes one card; an agent the mod holds no card for writes nothing. */
+const changeCard = async ($: Dollar, id: string, change: (c: AgentCard) => AgentCard) => {
+  if (!(await read($, agentsAtom)).some(c => c.id === id)) return
+  await update($, agentsAtom, cs => keepCards(withCard(cs, id, change)))
 }
 
 /** Re-read the session's figures; a new `startedAt` the mod did not see coming starts the counts over. */
@@ -144,6 +151,7 @@ export const registerTracking = (on: On): void => {
     // A fresh process starts counting; a reloaded module keeps the counts of this session. A read
     // refused this early is tried again just after.
     await refreshUsage($).catch(() => undefined)
+    await syncTick($)
     refreshLater($)
     return r
   })
@@ -181,7 +189,7 @@ export const registerTracking = (on: On): void => {
     if (e.agentId) {
       const agentId = e.agentId
       const sub = yield* next(e)
-      await update($, agentsAtom, cs => keepCards(withCard(cs, agentId, c => stepCard(c, sub.usage ?? null))))
+      await changeCard($, agentId, c => stepCard(c, sub.usage ?? null))
       return sub
     }
     await update($, liveAtom, l => ({
@@ -226,7 +234,7 @@ export const registerTracking = (on: On): void => {
     const now = await $.clock.now()
     if (e.agentId) {
       const agentId = e.agentId
-      await update($, agentsAtom, cs => keepCards(withCard(cs, agentId, c => endCard(c, e, now))))
+      await changeCard($, agentId, c => endCard(c, e, now))
       await syncTick($)
       return r
     }
@@ -259,13 +267,11 @@ export const registerTracking = (on: On): void => {
   })
 
   on('tool.call', async ($, e, next) => {
+    // A subagent's call is on its card before the tool runs: a long one shows while it works.
+    if (e.agentId) await changeCard($, e.agentId, c => callCard(c, e.tool, e))
     const r = await next(e)
     const isError = 'deny' in r ? true : r.isError === true
     await update($, countersAtom, c => ({ ...c, tools: { ...c.tools, [e.tool]: (c.tools[e.tool] ?? 0) + 1 } }))
-    if (e.agentId) {
-      const agentId = e.agentId
-      await update($, agentsAtom, cs => keepCards(withCard(cs, agentId, c => callCard(c, e.tool, (e as { input?: unknown }).input))))
-    }
     await update($, receiptAtom, rc =>
       // A denied or failed edit changed no file: an error, not an edit.
       rc?.isRunning ? { ...rc, edits: rc.edits + (EDIT_TOOLS.has(e.tool) && !isError ? 1 : 0), errors: rc.errors + (isError ? 1 : 0) } : rc,
@@ -279,7 +285,8 @@ export const registerTracking = (on: On): void => {
     if (r.deny === undefined) {
       await update($, countersAtom, c => ({ ...c, subagents: c.subagents + 1 }))
       await update($, receiptAtom, rc => (rc?.isRunning ? { ...rc, agents: rc.agents + 1 } : rc))
-      if (r.agentId) {
+      // A teammate lives in its own terminal pane and raises no end here: no card.
+      if (r.agentId && !e.isTeammate) {
         const card = spawnCard(r.agentId, e.subagentType, e.description, await $.clock.now())
         await update($, agentsAtom, cs => keepCards([...cs, card]))
         await syncTick($)

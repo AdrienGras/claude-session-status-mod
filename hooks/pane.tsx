@@ -69,7 +69,7 @@ export const registerPane = (on: On): void => {
             <Box flexDirection="row">
               <Text>{draw(row.lead)}</Text>
               {row.groups.map(g => (
-                <Button key={`g-${g.key}`} label={g.key} plain onPress={() => toggle(g.key)}>
+                <Button key={`g-${g.key}`} label={g.parts.map(p => p.text).join('').trim()} plain onPress={() => toggle(g.key)}>
                   {draw(g.parts)}
                 </Button>
               ))}
