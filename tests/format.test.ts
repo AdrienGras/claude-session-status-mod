@@ -20,8 +20,13 @@ test('token counts in k and M', () => {
   expect(fmtTokens(140_000)).toBe('140k')
   expect(fmtTokens(1_000_000)).toBe('1M')
   expect(fmtTokens(1_500_000)).toBe('1.5M')
-  expect(fmtTokens(999)).toBe('1k')
-  expect(fmtTokens(0)).toBe('0k')
+  expect(fmtTokens(1_000)).toBe('1k')
+  // Under a thousand, the count itself: never `0k` for a 300-token tool.
+  expect(fmtTokens(999)).toBe('999')
+  expect(fmtTokens(300)).toBe('300')
+  expect(fmtTokens(0)).toBe('0')
+  // What rounds to a thousand k is a million.
+  expect(fmtTokens(999_700)).toBe('1M')
 })
 
 test('dollars: cents below 100, whole above', () => {

@@ -15,13 +15,11 @@ export const fmtDur = (ms: number): string => {
   return hrs ? `${days}d${hrs}h` : `${days}d`
 }
 
-/** `140k`, `1M`, `1.5M`. */
+/** `300`, `140k`, `1M`, `1.5M`. */
 export const fmtTokens = (n: number): string => {
-  if (n >= 1_000_000) {
-    const m = Math.round(n / 100_000) / 10
-    return `${m}M`
-  }
-  return `${Math.round(n / 1000)}k`
+  if (n < 1_000) return `${Math.round(n)}`
+  if (Math.round(n / 1000) < 1_000) return `${Math.round(n / 1000)}k`
+  return `${Math.round(n / 100_000) / 10}M`
 }
 
 /** `$4.82` below a hundred, `$104` above. */

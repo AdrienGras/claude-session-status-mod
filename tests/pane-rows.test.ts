@@ -123,7 +123,7 @@ test('context lists unfold on demand, two to a row', () => {
   const rows = paneRows(input()).filter(r => r.kind === 'groups')
   expect(rows.length).toBe(2)
   expect(rows.flatMap(r => (r.kind === 'groups' ? r.groups.map(g => g.key) : []))).toEqual(['memory', 'mcp', 'skills', 'agents'])
-  expect(all(input()).join('\n')).toContain('▸ MCP 1 · 1k')
+  expect(all(input()).join('\n')).toContain('▸ MCP 1 · 800')
   expect(all(input({ expanded: ['mcp'] })).join('\n')).toContain('github')
 })
 
