@@ -74,6 +74,22 @@ export type UsageView = {
   breakdownDetail: 'summary' | 'full'
 }
 
+export type AgentState = 'running' | 'done' | 'failed' | 'stopped'
+export type AgentCall = { tool: string; detail: string | null }
+/** One subagent, as the Agents box draws it. */
+export type AgentCard = {
+  id: string
+  type: string
+  task: string
+  startedAt: number
+  endedAt: number | null
+  state: AgentState
+  steps: number
+  contextTokens: number | null
+  outputTokens: number
+  calls: AgentCall[] // newest last, at most three
+}
+
 /** Inside `declare module 'claude-code'` a bare `Settings` names the engine's own; this one is the mod's. */
 export type ModSettings = Settings
 
@@ -87,6 +103,7 @@ declare module 'claude-code' {
       git: GitSnapshot | null
       settings: ModSettings
       expanded: string[]
+      agents: AgentCard[]
     }
   }
 }
