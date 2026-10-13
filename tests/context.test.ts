@@ -1,6 +1,8 @@
+
+import type { SessionContextBreakdown } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import { compactHeadroom, contextLabel, mcpByServer, toSegments } from '../hooks/context'
+import { compactHeadroom, contextLabel, mcpByServer, toBreakdownView, toSegments } from '../hooks/context'
 
 const cat = (name: string, tokens: number, kind: 'used' | 'free' | 'buffer' | 'deferred', color = 'claude') => ({ name, tokens, color, kind })
 
@@ -56,4 +58,19 @@ test('headroom before auto-compaction', () => {
   expect(compactHeadroom(140_000, undefined)).toBe(null)
   expect(compactHeadroom(undefined, 160_000)).toBe(null)
   expect(compactHeadroom(170_000, 160_000)).toBe(0)
+})
+
+test('deferred MCP tools are outside the window: left out of the breakdown', () => {
+  const b = {
+    categories: [],
+    memoryFiles: [],
+    mcpTools: [
+      { name: 'mcp__github__search', serverName: 'github', tokens: 40_000, isLoaded: false },
+      { name: 'mcp__docs__read', serverName: 'docs', tokens: 1_000, isLoaded: true },
+    ],
+    agents: [],
+    gridRows: [],
+    isAutoCompactEnabled: true,
+  } as unknown as SessionContextBreakdown
+  expect(toBreakdownView(b).mcpTools).toEqual([{ name: 'mcp__docs__read', serverName: 'docs', tokens: 1_000 }])
 })
