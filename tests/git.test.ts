@@ -68,7 +68,7 @@ test('in a repo without upstream: no ahead/behind; session files by mtime', asyn
     {
       'branch --show-current': { exitCode: 0, stdout: 'main\n' },
       'diff --shortstat HEAD': { exitCode: 0, stdout: ' 2 files changed, 5 insertions(+), 1 deletion(-)\n' },
-      'status --porcelain': { exitCode: 0, stdout: ' M old.ts\n M fresh.ts\n' },
+      '--no-optional-locks status --porcelain': { exitCode: 0, stdout: ' M old.ts\n M fresh.ts\n' },
     },
     { '/work/x/old.ts': 100, '/work/x/fresh.ts': 2_000 },
   )
@@ -99,4 +99,13 @@ test('readings are cached within the TTL', async () => {
   const first = runs
   await read(d, 0)
   expect(runs).toBe(first)
+})
+
+test('status never takes the index lock', async () => {
+  const seen: string[] = []
+  const d = deps({ root: '/work/x', remote: null }, {})
+  const run = d.process.run
+  d.process.run = async (argv, init) => (seen.push(argv.join(' ')), run(argv, init))
+  await makeGitReader()(d, 0)
+  expect(seen).toContain('git --no-optional-locks status --porcelain')
 })

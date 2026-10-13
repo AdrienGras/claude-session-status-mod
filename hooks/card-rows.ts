@@ -14,10 +14,10 @@ const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 
 /** `claude-opus-5-5` → `Opus 5.5`; a dated or `[1m]` id the same; a display name as it is. */
 export const prettyModel = (id: string): string => {
-  const m = id.replace(/\[.*\]$/, '').match(/^claude-([a-z]+)-(\d+)-(\d+)(?:-\d{8})?$/)
+  const m = id.replace(/\[.*\]$/, '').match(/^claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?:-\d{8})?$/)
   if (!m) return id
   const family = m[1]!
-  return `${family[0]!.toUpperCase()}${family.slice(1)} ${m[2]}.${m[3]}`
+  return `${family[0]!.toUpperCase()}${family.slice(1)} ${m[2]}${m[3] ? `.${m[3]}` : ''}`
 }
 
 /** `effort ▮▮▮▯▯ high`; a level it does not know, as a word alone. */
@@ -40,7 +40,7 @@ export const cellsToParts = (cells: readonly Cell[]): Part[] =>
 const WINDOW_LABEL: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 
 /** One rate-limit window: a burn bar where its length and reset are known, else a plain gauge. */
-export const quotaParts = (r: RateLimit, width: number, now: number): Part[] => {
+export const quotaParts = (r: RateLimit, width: number, now: number, showUsed = false): Part[] => {
   const label: Part = { text: `${WINDOW_LABEL[r.kind] ?? r.kind} `, dim: true }
   const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
   const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
@@ -50,7 +50,8 @@ export const quotaParts = (r: RateLimit, width: number, now: number): Part[] => 
     return [label, ...cellsToParts(eighthBar(r.percentUsed / 100, width, color)), { text: ` ${Math.round(r.percentUsed)}%`, color }]
   }
   const tone = projectionTone(burn)
-  return [label, ...cellsToParts(burnBar(burn, width)), { text: ` ${projectionText(burn)} ${burnVerdict(burn)}`, color: tone }]
+  const used: Part[] = showUsed ? [{ text: ` ${Math.round(r.percentUsed)}%`, dim: true }] : []
+  return [label, ...cellsToParts(burnBar(burn, width)), ...used, { text: ` ${projectionText(burn)} ${burnVerdict(burn)}`, color: tone }]
 }
 
 /** The context gauge: segments by category when the breakdown is in, else one tone. */

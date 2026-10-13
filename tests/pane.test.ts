@@ -5,8 +5,9 @@ import { fakeEngine, paneTarget, startSession, typed } from './engine'
 const H = 3_600_000
 
 test('the docked pane shows its sections', async ($, on) => {
-  fakeEngine(on, { rateLimits: [{ kind: 'five_hour', percentUsed: 20, resetsAt: new Date(2.5 * H).toISOString() }], cost: { usd: 1.2 } })
+  const fake = fakeEngine(on, { rateLimits: [{ kind: 'five_hour', percentUsed: 20, resetsAt: new Date(2.5 * H).toISOString() }], cost: { usd: 1.2 } })
   await startSession($)
+  await fake.clock.settle() // git is read after session.start hands back
   const ui = await $.ui.mount(paneTarget())
   for (const title of ['Model', 'Context', 'Quotas', 'Session', 'Repo']) expect(await ui.find({ text: new RegExp(`^${title}`) })).toBeDefined()
   await ui.unmount()

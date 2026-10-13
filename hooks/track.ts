@@ -36,7 +36,15 @@ async function readGit($: Dollar, startedAt: number): Promise<GitSnapshot> {
   )
 }
 
-/** Re-read the session's figures; a new `startedAt` (a /clear) starts the counts over. */
+// Set by a /clear or a resume: the counts already started over, so the new session's first
+// figures must not wipe what its first turn counted.
+let isCountReset = false
+
+/** How often the drawings are redrawn while nothing else moves: countdowns, the `┊` mark. */
+const REDRAW_MS = 30_000
+let redraw: { cancel: () => void } | null = null
+
+/** Re-read the session's figures; a new `startedAt` the mod did not see coming starts the counts over. */
 const refreshUsage = async ($: Dollar) => {
   const u = await $.session.usage({ breakdown: 'summary' })
   const prompts = await $.session.turns()
@@ -55,10 +63,25 @@ const refreshUsage = async ($: Dollar) => {
   }
   await update($, usageAtom, () => view)
   if (before && before.startedAt !== u.startedAt) {
-    await update($, countersAtom, () => emptyCounters(u.startedAt))
-    await update($, receiptAtom, () => null)
+    if (!isCountReset) {
+      await update($, countersAtom, () => emptyCounters(u.startedAt))
+      await update($, receiptAtom, () => null)
+    }
+    isCountReset = false
   }
   return view
+}
+
+/** Usage figures and git, read after the hook that asked has handed back. */
+const refreshLater = ($: Dollar, finish?: (view: UsageView) => Promise<void>) => {
+  $.clock.after(0, () => {
+    void (async () => {
+      const view = await refreshUsage($)
+      if (finish) await finish(view)
+      const snap = await readGit($, view.startedAt)
+      await update($, gitAtom, () => snap)
+    })()
+  })
 }
 
 /** Wires the session's events to the state atoms. */
@@ -76,9 +99,27 @@ export const registerTracking = (on: On): void => {
     const stored = await $.store.get(SETTINGS_KEY)
     await update($, settingsAtom, () => normalizeSettings(stored))
     const view = await refreshUsage($)
-    await update($, countersAtom, () => emptyCounters(view.startedAt))
-    const snap = await readGit($, view.startedAt)
-    await update($, gitAtom, () => snap)
+    // A fresh process starts counting; a reloaded module keeps the counts of this session.
+    await update($, countersAtom, c => (c.since < view.startedAt ? emptyCounters(view.startedAt) : c))
+    redraw?.cancel()
+    redraw = $.clock.every(REDRAW_MS, () => $.ui.invalidate('ui.render'))
+    refreshLater($)
+    return r
+  })
+
+  // /clear (and a resume) starts the conversation over: so do the counts, at once.
+  on('session.end', async ($, e, next) => {
+    const r = await next(e)
+    if (e.reason !== 'clear' && e.reason !== 'resume') return r
+    const now = await $.clock.now()
+    isCountReset = true
+    await update($, countersAtom, () => emptyCounters(now))
+    await update($, receiptAtom, () => null)
+    await update($, liveAtom, l => ({ ...l, requests: 0, speed: null, isWorking: false }))
+    // The old conversation's fill and cost no longer hold; the next figures bring the new ones.
+    await update($, usageAtom, u => u && { ...u, tokens: undefined, costUsd: undefined, prompts: 0, breakdown: null })
+    const stored = await $.store.get(SETTINGS_KEY)
+    await update($, settingsAtom, () => normalizeSettings(stored))
     return r
   })
 
@@ -93,7 +134,8 @@ export const registerTracking = (on: On): void => {
     await update($, liveAtom, l => ({
       ...l,
       model: e.model,
-      effort: e.effort === undefined ? l.effort : String(e.effort),
+      // A model without effort sends none: the gauge goes.
+      effort: e.effort === undefined ? null : String(e.effort),
       requests: l.requests + 1,
     }))
     const sentAt = await $.clock.now()
@@ -128,24 +170,22 @@ export const registerTracking = (on: On): void => {
     const r = await next(e)
     if (e.agentId) return r
     const now = await $.clock.now()
-    const view = await refreshUsage($)
     await update($, liveAtom, l => ({ ...l, isWorking: false }))
-    await update($, receiptAtom, rc =>
-      rc && {
-        ...rc,
-        isRunning: false,
-        durationMs: now - rc.startedAt,
-        costAddedUsd: view.costUsd !== undefined && costAtTurnStart !== undefined ? view.costUsd - costAtTurnStart : null,
-      },
-    )
-    const snap = await readGit($, view.startedAt)
-    await update($, gitAtom, () => snap)
+    await update($, receiptAtom, rc => rc && { ...rc, isRunning: false, durationMs: now - rc.startedAt })
+    // The figures and git come after the turn is handed back, never holding it.
+    const costBefore = costAtTurnStart
+    refreshLater($, async view => {
+      const added = view.costUsd !== undefined && costBefore !== undefined ? view.costUsd - costBefore : null
+      await update($, receiptAtom, rc => rc && { ...rc, costAddedUsd: added })
+    })
     return r
   })
 
   on('session.compact', async ($, e, next) => {
     const r = await next(e)
-    await update($, countersAtom, c => ({ ...c, compactions: c.compactions + 1 }))
+    // A precompute installs nothing, a subagent compacts its own transcript, a skip compacts nothing.
+    const isCompaction = e.trigger !== 'precompute' && !e.agentId && r.messages !== undefined
+    if (isCompaction) await update($, countersAtom, c => ({ ...c, compactions: c.compactions + 1 }))
     return r
   })
 

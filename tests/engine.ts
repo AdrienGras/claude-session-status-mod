@@ -11,6 +11,7 @@ export type FakeEngine = {
   commands: string[]
   clock: MockClock
   usageCalls: unknown[]
+  repo: { root: string; remote: string | null } | null
 }
 
 export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine => {
@@ -27,10 +28,11 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     commands: [],
     clock: mock.clock(on),
     usageCalls: [],
+    repo: null,
   }
   mock.store(on)
   on('session.cwd', () => ({ value: '/work/x' }))
-  on('session.repo', () => ({ value: null }))
+  on('session.repo', () => ({ value: fake.repo && { ...fake.repo, internal: false, name: null } }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => (fake.commands.push(e.name), { value: { command: e.name } }))
   on('session.usage', (_$, e) => (fake.usageCalls.push(e), { value: fake.usage }))

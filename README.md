@@ -57,7 +57,7 @@ The mod does not touch your settings. Once you are happy with it, remove the `st
 ## Measured, estimated, counted
 
 - **Colours** come from your Claude Code theme, so light, dark and colour-blind themes all read. Gauges step from success to warning to error: at 50% and 80% for context, and at 80% and 130% of projected use for quotas.
-- **The context breakdown is an estimate** (Claude Code's local one, which costs nothing). The pane marks it `≈` until you press **recount**, which sends one token-count request per tool and memory file, as `/context` does. The total and percentage are the real figures.
+- **The context breakdown is an estimate** (Claude Code's local one, which costs nothing), marked `≈` in the pane. **recount** replaces it with the exact count, sending one token-count request per tool and memory file as `/context` does; the next turn's figures bring the estimate back. The total and percentage are always the real figures.
 - **Burn-rate projections** assume your pace so far holds until the reset. Early in a window (under 10% elapsed) they are marked `~` and drawn dim.
 - **Time to first token and tokens per second** are timed by the mod around each request, so they include the network and other mods' hooks. They are not the API's own figures.
 - **Compactions, tool calls and subagents** are counted by the mod from when it loaded, and labelled *since open*. Cost, duration and prompts come from Claude Code and cover the whole session, a resumed one included.
@@ -65,7 +65,7 @@ The mod does not touch your settings. Once you are happy with it, remove the `st
 
 ## Privacy
 
-Everything runs locally. The mod reads Claude Code's session data and runs `git` in your project for the repo section. It makes no network request and calls no model. It keeps only its settings across sessions.
+The mod reads Claude Code's session data and runs `git` in your project for the repo section. On its own it makes no network request and calls no model. Only two buttons do, when you press them: **recount** (token-count requests, as `/context`) and **compact** (runs `/compact`). It keeps only its settings across sessions.
 
 ## Development
 

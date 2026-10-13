@@ -39,6 +39,8 @@ export type GitDeps = {
 }
 
 const TTL_MS = 5_000
+/** Dirty paths looked at for the session's own files: a huge worktree is not walked whole. */
+const MAX_STATS = 200
 
 /** A reader that runs `git` at most once per TTL; the snapshot in between is the cached one. */
 export const makeGitReader = (ttlMs = TTL_MS) => {
@@ -69,17 +71,28 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
           return null
         }
       }
-      snap.branch = (await git('branch', '--show-current'))?.trim() || null
-      Object.assign(snap, parseShortstat((await git('diff', '--shortstat', 'HEAD')) ?? ''))
-      const ab = parseAheadBehind((await git('rev-list', '--left-right', '--count', '@{u}...HEAD')) ?? '')
+      const [branch, shortstat, aheadBehind, status] = await Promise.all([
+        git('branch', '--show-current'),
+        git('diff', '--shortstat', 'HEAD'),
+        git('rev-list', '--left-right', '--count', '@{u}...HEAD'),
+        // Read-only: never take the index lock while the person's own git runs.
+        git('--no-optional-locks', 'status', '--porcelain'),
+      ])
+      snap.branch = branch?.trim() || null
+      Object.assign(snap, parseShortstat(shortstat ?? ''))
+      const ab = parseAheadBehind(aheadBehind ?? '')
       if (ab) Object.assign(snap, ab)
-      for (const path of parsePorcelain((await git('status', '--porcelain')) ?? '')) {
-        try {
-          if ((await $.fs.stat(`${info.root}/${path}`)).mtimeMs >= startedAt) snap.sessionFiles.push(path)
-        } catch {
-          // Deleted or unreadable: not a file this session left behind.
-        }
-      }
+      const paths = parsePorcelain(status ?? '').slice(0, MAX_STATS)
+      const fresh = await Promise.all(
+        paths.map(async path => {
+          try {
+            return (await $.fs.stat(`${info.root}/${path}`)).mtimeMs >= startedAt
+          } catch {
+            return false // deleted or unreadable: not a file this session left behind
+          }
+        }),
+      )
+      snap.sessionFiles = paths.filter((_, i) => fresh[i])
     }
     cached = { at: now, snap }
     return snap

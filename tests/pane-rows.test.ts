@@ -91,6 +91,7 @@ test('context groups unfold on demand', () => {
 test('quotas: burn bars with reset time; none when the account reports none', () => {
   const t = sectionText(input(), 'quotas')!
   expect(t).toContain('→ 40%')
+  expect(t).toContain(' 20%')
   expect(t).toContain('⧗2h30')
   expect(t).toMatch(/resets \d\d:\d\d/)
   expect(sectionText(input({ usage: { ...input().usage!, rateLimits: [] } }), 'quotas')).toBe(undefined)

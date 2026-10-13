@@ -126,7 +126,7 @@ const quotas = (usage: UsageView, width: number, now: number): Section | null =>
   if (usage.rateLimits.length === 0) return null
   const lines: Line[] = []
   for (const r of usage.rateLimits) {
-    lines.push(quotaParts(r, width, now))
+    lines.push(quotaParts(r, width, now, true))
     const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
     if (Number.isFinite(resetsAt)) {
       const left = r.kind in WINDOW_MS ? `⧗${fmtDur(Math.max(0, resetsAt - now))} · ` : ''
