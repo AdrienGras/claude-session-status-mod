@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { cellWidth } from '../hooks/cells'
 import { fitLine, paneRows } from '../hooks/pane-rows'
 import type { PaneInput } from '../hooks/pane-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
@@ -77,8 +78,20 @@ test('every row spans the pane exactly, however long its content', () => {
       git: { ...input().git!, cwd: `/srv/${'very-long-directory/'.repeat(6)}x`, sessionFiles: [`${'deep/'.repeat(20)}file.ts`] },
       expanded: ['memory', 'mcp', 'agents'],
     })
-    for (const r of all(long)) expect([...r].length).toBe(columns)
+    for (const r of all(long)) expect(cellWidth(r)).toBe(columns)
   }
+})
+
+test('every row spans the pane in cells, with wide glyphs and a long branch', () => {
+  const wide = input({
+    usage: { ...input().usage!, rateLimits: [{ kind: 'five_hour', percentUsed: 100, resetsAt: iso(NOW + H) }] },
+    git: { ...input().git!, cwd: '/srv/プロジェクト/日本語のフォルダ/もっと長い名前', branch: 'dependabot/npm_and_yarn/typescript-5.9.3', sessionFiles: ['ドキュメント/会議.md'] },
+  })
+  const rows = all(wide)
+  expect(rows.join('\n')).toContain('⛔')
+  for (const r of rows) expect(cellWidth(r)).toBe(48)
+  const top = rows.find(r => r.startsWith('╭─ Repo'))!
+  expect(top.endsWith('─╮')).toBe(true)
 })
 
 test('header: model and state in the frame, effort, mode, requests, speed, window', () => {

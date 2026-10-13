@@ -1,5 +1,6 @@
 // The status line under the prompt: the person's items, one line, cut to the room it has.
 import { lineBar, segmentBar, burnBar } from './bars'
+import { cellWidth } from './cells'
 import { contextTone, projectionText, projectionTone, readQuota } from './burn'
 import { contextFigure, contextLabel, toSegments } from './context'
 import { fmtUsd } from './format'
@@ -14,7 +15,7 @@ const WINDOW_LABEL: Record<string, string> = { five_hour: '5h', seven_day: '7d' 
 
 export type MinibarInput = { usage: UsageView | null; live: Live; git: GitSnapshot | null; settings: Settings; now: number }
 
-const width = (parts: Part[]) => parts.reduce((a, p) => a + [...p.text].length, 0)
+const width = (parts: Part[]) => parts.reduce((a, p) => a + cellWidth(p.text), 0)
 
 const model = (live: Live): Part[] | null => {
   if (!live.model) return null
@@ -82,7 +83,7 @@ const LEAD: Part = { text: '  │ ', color: 'subtle' }
 /** Columns kept for the line's padding and the open mark. */
 const RESERVED = 6
 
-/** The status as drawn after a hint `hintWidth` wide on a `columns`-wide row; empty when nothing fits. */
+/** The status as drawn after a hint `hintWidth` cells wide on a `columns`-wide row; empty when nothing fits. */
 export const minibarLine = (input: MinibarInput, hintWidth: number, columns: number): Part[] => {
   const parts = minibarParts(input, columns - hintWidth - RESERVED - width([LEAD]))
   return parts.length ? [LEAD, ...parts] : []

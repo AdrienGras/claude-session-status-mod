@@ -2,6 +2,7 @@
 // pane.tsx only draws these rows and wires the buttons.
 import { burnBar, lineBar, segmentBar } from './bars'
 import { burnVerdict, contextTone, projectionText, projectionTone, readQuota } from './burn'
+import { cellWidth, takeCells, takeLastCells } from './cells'
 import { compactHeadroom, contextFigure, contextLabel, mcpByServer, toSegments } from './context'
 import { fmtDur, fmtTokens, fmtUsd, fmtWhen } from './format'
 import { cellsToParts, effortGauge, prettyModel } from './parts'
@@ -43,24 +44,25 @@ const FRAME = 4
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 const dim = (text: string): Part => ({ text, dim: true })
 const border = (text: string): Part => ({ text, color: 'subtle' })
-const len = (parts: readonly Part[]) => parts.reduce((a, p) => a + [...p.text].length, 0)
+/** Cells, not code points: `⛔` or a CJK name takes two. */
+const len = (parts: readonly Part[]) => parts.reduce((a, p) => a + cellWidth(p.text), 0)
 
 /** Seconds under a minute, else the compact duration. */
 const fmtSpan = (ms: number) => (ms < 60_000 ? `${Math.max(0, Math.round(ms / 1000))}s` : fmtDur(ms))
 
-/** A line cut at `columns`, its last visible character an ellipsis. */
+/** A line cut within `columns` cells, its last visible character an ellipsis. */
 export const fitLine = (line: readonly Part[], columns: number): Part[] => {
   if (len(line) <= columns) return [...line]
   const out: Part[] = []
   let used = 0
   for (const p of line) {
-    const chars = [...p.text]
-    if (used + chars.length < columns) {
+    const w = cellWidth(p.text)
+    if (used + w < columns) {
       out.push(p)
-      used += chars.length
+      used += w
       continue
     }
-    out.push({ ...p, text: `${chars.slice(0, Math.max(0, columns - used - 1)).join('')}…` })
+    out.push({ ...p, text: `${takeCells(p.text, Math.max(0, columns - used - 1))}…` })
     break
   }
   return out
@@ -81,18 +83,17 @@ const spread = ({ left, right = [] }: Row, width: number): Part[] => {
 }
 
 /** A path cut from its start, so the end that names the file stays. */
-const tail = (path: string, max: number) => {
-  const chars = [...path]
-  return chars.length <= max ? path : `…${chars.slice(chars.length - max + 1).join('')}`
-}
+const tail = (path: string, max: number) => (cellWidth(path) <= max ? path : `…${takeLastCells(path, max - 1)}`)
 
-/** `╭─ Title ───────── aside ─╮`, exactly `columns` wide. */
+/** `╭─ Title ───────── aside ─╮`, exactly `columns` wide; the aside (a branch name) gives way to the title. */
 const frameTop = (title: Part[], aside: Part[], columns: number): Part[] => {
   // `╭─ ` + title + ` ` + fill + (` ` + aside + ` `) + `─╮`
-  const asideWidth = aside.length ? len(aside) + 2 : 0
+  const room = columns - 8 - len(title) - 2
+  const shown = aside.length && room >= 4 ? fitLine(aside, room) : []
+  const asideWidth = shown.length ? len(shown) + 2 : 0
   const head = fitLine(title, Math.max(1, columns - 8 - asideWidth))
   const fill = Math.max(1, columns - 6 - len(head) - asideWidth)
-  const end = aside.length ? [{ text: ' ' }, ...aside, border(' ─╮')] : [border('─╮')]
+  const end = shown.length ? [{ text: ' ' }, ...shown, border(' ─╮')] : [border('─╮')]
   const row = [border('╭─ '), ...head, border(` ${'─'.repeat(fill)}`), ...end]
   return len(row) === columns ? row : pad(row, columns)
 }

@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { cellWidth } from '../hooks/cells'
 import { minibarLine, minibarParts, minibarRow } from '../hooks/minibar-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE } from '../hooks/state'
@@ -96,4 +97,12 @@ test('a window read before its reset shows no figure', () => {
   const t = bar({ usage: stale })
   expect(t).not.toContain('80%')
   expect(t.endsWith('5h —')).toBe(true)
+})
+
+test('the budget counts cells: a wide ⛔ does not run past it', () => {
+  const full = { ...usage, rateLimits: [{ kind: 'five_hour', percentUsed: 100, resetsAt: iso(NOW + H) }] }
+  const all = bar({ usage: full })
+  expect(all).toContain('⛔')
+  const codePoints = [...all].length
+  expect(cellWidth(bar({ usage: full }, codePoints)) <= codePoints).toBe(true)
 })

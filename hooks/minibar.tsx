@@ -3,6 +3,7 @@
 import type { On } from 'claude-code'
 import { atom, read } from 'claude-code'
 
+import { cellWidth } from './cells'
 import { minibarLine, minibarRow } from './minibar-rows'
 import { normalizeSettings } from './settings'
 import { EMPTY_LIVE, INITIAL_SETTINGS } from './state'
@@ -57,7 +58,7 @@ export const registerMinibar = (on: On): void => {
     }
 
     const hint = e.props.hint
-    const parts = minibarLine(input, [...hint].length, columns)
+    const parts = minibarLine(input, cellWidth(hint), columns)
     if (parts.length === 0) return next(e)
     return (
       <Box flexDirection="row" justifyContent="space-between" paddingX={2}>
