@@ -9,7 +9,7 @@ import { normalizeSettings } from './settings'
 import { CONFIG_PANE_ID } from './settings-view'
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import { S } from './strings'
-import type { GitSnapshot, Receipt, UsageView } from '../types'
+import type { AgentCard, GitSnapshot, Receipt, UsageView } from '../types'
 
 export const PANE_ID = 'sst'
 
@@ -18,6 +18,7 @@ const liveAtom = atom({ plugin: 'session-status', key: 'live' } as const, EMPTY_
 const countersAtom = atom({ plugin: 'session-status', key: 'counters' } as const, emptyCounters(0))
 const receiptAtom = atom({ plugin: 'session-status', key: 'receipt' } as const, null as Receipt | null)
 const gitAtom = atom({ plugin: 'session-status', key: 'git' } as const, null as GitSnapshot | null)
+const agentsAtom = atom({ plugin: 'session-status', key: 'agents' } as const, [] as AgentCard[])
 const settingsAtom = atom({ plugin: 'session-status', key: 'settings' } as const, INITIAL_SETTINGS)
 const expandedAtom = atom({ plugin: 'session-status', key: 'expanded' } as const, [] as string[])
 
@@ -33,7 +34,7 @@ export const registerPane = (on: On): void => {
       git: await read($, gitAtom),
       settings: normalizeSettings(await read($, settingsAtom)),
       expanded: await read($, expandedAtom),
-      agents: [],
+      agents: await read($, agentsAtom),
       now: await $.clock.now(),
       columns,
     })
