@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import { fakeEngine, startSession } from './engine'
+import { configTarget, fakeEngine, startSession } from './engine'
 
 const hint = (surface: 'terminal' | 'desktop' = 'terminal') => ({
   plugin: 'session-status',
@@ -57,5 +57,20 @@ test('the open mark opens the side pane', async ($, on) => {
   expect((await ui.find({ key: 'open' }))?.props.label).toBe('◨')
   await ui.press({ key: 'open' })
   expect(fake.openPanes.has('sst')).toBe(true)
+  await ui.unmount()
+})
+
+test('on a row of its own, the engine line is kept as drawn and the status goes under it', async ($, on) => {
+  fakeEngine(on)
+  beneath(on)
+  await startSession($)
+  const config = await $.ui.mount(configTarget())
+  await config.press({ key: 'layout' })
+  await config.unmount()
+  const ui = await $.ui.mount(hint())
+  expect(await ui.find({ text: /engine hint/ })).toBeDefined()
+  expect(await ui.find({ text: /\? for shortcuts/ })).toBeUndefined()
+  expect(await ui.find({ text: /Opus 5\.5/ })).toBeDefined()
+  expect(await ui.find({ key: 'open' })).toBeDefined()
   await ui.unmount()
 })

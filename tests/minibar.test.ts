@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { minibarLine, minibarParts } from '../hooks/minibar-rows'
+import { minibarLine, minibarParts, minibarRow } from '../hooks/minibar-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE } from '../hooks/state'
 import type { UsageView } from '../types'
@@ -72,4 +72,13 @@ test('items that do not fit are dropped from the right', () => {
   expect(narrow.startsWith('Opus 5.5 ▮▮▮▯▯')).toBe(true)
   expect(narrow).not.toContain('5h')
   expect(bar({}, 5)).toBe('')
+})
+
+test('on a row of its own, no lead and the whole width', () => {
+  const input = { usage, live, git: null, settings: DEFAULT_SETTINGS, now: NOW }
+  const row = text(minibarRow(input, 200))
+  expect(row.startsWith('Opus 5.5')).toBe(true)
+  expect(row).toBe(bar())
+  expect(text(minibarRow(input, 30))).toBe('Opus 5.5 ▮▮▮▯▯')
+  expect(minibarRow(input, 10)).toEqual([])
 })

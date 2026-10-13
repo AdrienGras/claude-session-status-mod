@@ -16,7 +16,10 @@ export type GitSnapshot = {
 
 export type CardLine = 'model' | 'context' | 'five_hour' | 'seven_day' | 'cost' | 'repo'
 
-export type Settings = { cardLines: CardLine[]; barWidth: number }
+/** `inline`: beside Claude Code's hint, one row; `below`: a row of its own under it, the hint kept as the engine draws it. */
+export type HintLayout = 'inline' | 'below'
+
+export type Settings = { cardLines: CardLine[]; barWidth: number; hintLayout: HintLayout }
 
 export type Speed = { ttftMs: number; tokPerS: number | null }
 

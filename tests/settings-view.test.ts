@@ -38,3 +38,14 @@ test('bars widen up to 24 and no further', async ($, on) => {
   expect((await modState($)).settings.barWidth).toBe(24)
   await ui.unmount()
 })
+
+test('the layout switch is kept', async ($, on) => {
+  fakeEngine(on)
+  await startSession($)
+  const ui = await $.ui.mount(configTarget())
+  expect(await ui.find({ text: /beside Claude Code's hint/ })).toBeDefined()
+  await ui.press({ key: 'layout' })
+  expect((await modState($)).settings.hintLayout).toBe('below')
+  expect(await ui.find({ text: /own row/ })).toBeDefined()
+  await ui.unmount()
+})

@@ -64,7 +64,7 @@ export const modState = async ($: { command: { run: (e: never) => Promise<unknow
     live: { model: string | null; effort: string | null; isWorking: boolean; requests: number; speed: unknown }
     counters: { compactions: number; tools: Record<string, number>; subagents: number }
     receipt: { edits: number; errors: number; agents: number; isRunning: boolean } | null
-    settings: { cardLines: string[]; barWidth: number }
+    settings: { cardLines: string[]; barWidth: number; hintLayout: string }
   }
 }
 

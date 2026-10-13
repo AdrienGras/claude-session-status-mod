@@ -90,3 +90,6 @@ export const minibarLine = (input: MinibarInput, hintWidth: number, columns: num
   const parts = minibarParts(input, columns - hintWidth - RESERVED - width([LEAD]))
   return parts.length ? [LEAD, ...parts] : []
 }
+
+/** The status on a row of its own, under the engine's hint: the whole row, no lead. */
+export const minibarRow = (input: MinibarInput, columns: number): Part[] => minibarParts(input, columns - RESERVED)

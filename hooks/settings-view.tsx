@@ -1,8 +1,8 @@
-// The settings pane: which lines the card shows, in what order, and how wide its bars are.
+// The settings pane: which lines the card shows, in what order, how wide its bars are, and where it sits.
 import type { On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import { moveLine, normalizeSettings, resizeBars, SETTINGS_KEY, settingsRows, toggleLine } from './settings'
+import { moveLine, normalizeSettings, resizeBars, SETTINGS_KEY, settingsRows, toggleLayout, toggleLine } from './settings'
 import { INITIAL_SETTINGS } from './state'
 import { S } from './strings'
 import type { CardLine, Settings } from '../types'
@@ -54,6 +54,10 @@ export const registerSettingsView = (on: On): void => {
           <Button key="narrower" label="−" hotkey="n" onPress={() => change(s => resizeBars(s, -1))} />
           <Text> </Text>
           <Button key="wider" label="+" hotkey="w" onPress={() => change(s => resizeBars(s, 1))} />
+        </Box>
+        <Box marginTop={1} flexDirection="row">
+          <Text>{`${S.layout} ${current.hintLayout === 'below' ? S.layoutBelow : S.layoutInline}  `}</Text>
+          <Button key="layout" label={S.layoutSwitch} hotkey="l" onPress={() => change(toggleLayout)} />
         </Box>
         <Box marginTop={1}>
           <Button key="done" label={S.done} role="dismiss" onPress={() => $.ui.close({ id: CONFIG_PANE_ID })} />

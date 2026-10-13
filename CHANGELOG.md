@@ -8,6 +8,7 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 - Contributing guide, code of conduct, security policy, issue and pull request templates.
 - CI: manifest validation and tests on every push and pull request; GitHub releases published from tags.
+- A **Layout** setting in `/sst config`: the status line can take a row of its own under Claude Code's hint, which then stays exactly as Claude Code draws it (coloured mode, live pills). The default is unchanged: one row.
 
 ## [0.1.1] - 2026-10-13
 
