@@ -63,15 +63,18 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
       sessionFiles: [],
     }
     if (info) {
+      // In the session's folder, not `info.root`: that is the main working tree's, even from a
+      // linked worktree, whose branch and changes are its own.
       const git = async (...args: string[]): Promise<string | null> => {
         try {
-          const r = await $.process.run(['git', ...args], { cwd: info.root, timeoutMs: 3_000 })
+          const r = await $.process.run(['git', ...args], { cwd, timeoutMs: 3_000 })
           return r.exitCode === 0 ? r.stdout : null
         } catch {
           return null
         }
       }
-      const [branch, shortstat, aheadBehind, status] = await Promise.all([
+      const [top, branch, shortstat, aheadBehind, status] = await Promise.all([
+        git('rev-parse', '--show-toplevel'),
         git('branch', '--show-current'),
         git('diff', '--shortstat', 'HEAD'),
         git('rev-list', '--left-right', '--count', '@{u}...HEAD'),
@@ -82,11 +85,13 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
       Object.assign(snap, parseShortstat(shortstat ?? ''))
       const ab = parseAheadBehind(aheadBehind ?? '')
       if (ab) Object.assign(snap, ab)
-      const paths = parsePorcelain(status ?? '').slice(0, MAX_STATS)
+      // Porcelain paths are from the top of this worktree; without it they can't be looked at.
+      const root = top?.trim()
+      const paths = root ? parsePorcelain(status ?? '').slice(0, MAX_STATS) : []
       const fresh = await Promise.all(
         paths.map(async path => {
           try {
-            return (await $.fs.stat(`${info.root}/${path}`)).mtimeMs >= startedAt
+            return (await $.fs.stat(`${root}/${path}`)).mtimeMs >= startedAt
           } catch {
             return false // deleted or unreadable: not a file this session left behind
           }

@@ -66,6 +66,7 @@ test('in a repo without upstream: no ahead/behind; session files by mtime', asyn
   const d = deps(
     { root: '/work/x', remote: 'git@github.com:AdrienGras/x.git' },
     {
+      'rev-parse --show-toplevel': { exitCode: 0, stdout: '/work/x\n' },
       'branch --show-current': { exitCode: 0, stdout: 'main\n' },
       'diff --shortstat HEAD': { exitCode: 0, stdout: ' 2 files changed, 5 insertions(+), 1 deletion(-)\n' },
       '--no-optional-locks status --porcelain': { exitCode: 0, stdout: ' M old.ts\n M fresh.ts\n' },
@@ -108,4 +109,25 @@ test('status never takes the index lock', async () => {
   d.process.run = async (argv, init) => (seen.push(argv.join(' ')), run(argv, init))
   await makeGitReader()(d, 0)
   expect(seen).toContain('git --no-optional-locks status --porcelain')
+})
+
+test('in a linked worktree, git runs in the session folder and paths join its own top', async () => {
+  const cwds = new Set<string | undefined>()
+  const d = deps(
+    // The API's root is the main working tree's, even from a linked worktree.
+    { root: '/work/main', remote: null },
+    {
+      'rev-parse --show-toplevel': { exitCode: 0, stdout: '/work/wt\n' },
+      'branch --show-current': { exitCode: 0, stdout: 'feature\n' },
+      '--no-optional-locks status --porcelain': { exitCode: 0, stdout: ' M edited.ts\n' },
+    },
+    { '/work/wt/edited.ts': 2_000 },
+  )
+  d.session.cwd = async () => '/work/wt/sub'
+  const run = d.process.run
+  d.process.run = async (argv, init) => (cwds.add(init?.cwd), run(argv, init))
+  const snap = await makeGitReader()(d, 1_000)
+  expect([...cwds]).toEqual(['/work/wt/sub'])
+  expect(snap.branch).toBe('feature')
+  expect(snap.sessionFiles).toEqual(['edited.ts'])
 })
