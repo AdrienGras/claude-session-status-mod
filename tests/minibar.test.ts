@@ -82,3 +82,11 @@ test('on a row of its own, no lead and the whole width', () => {
   expect(text(minibarRow(input, 30))).toBe('Opus 5.5 ▮▮▮▯▯')
   expect(minibarRow(input, 10)).toEqual([])
 })
+
+const git = { cwd: '/w', repo: null, branch: 'main', files: 1, added: 3, removed: 1, ahead: null, behind: null, sessionFiles: [] }
+
+test('branch & diff, the diff left out when unknown', () => {
+  const settings = { ...DEFAULT_SETTINGS, cardLines: ['repo' as const] }
+  expect(bar({ settings, git })).toBe(' main +3 −1')
+  expect(bar({ settings, git: { ...git, files: null, added: null, removed: null } })).toBe(' main')
+})

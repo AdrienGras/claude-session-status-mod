@@ -6,9 +6,9 @@ export type GitSnapshot = {
   cwd: string
   repo: string | null
   branch: string | null
-  files: number
-  added: number
-  removed: number
+  files: number | null
+  added: number | null
+  removed: number | null
   ahead: number | null
   behind: number | null
   sessionFiles: string[]

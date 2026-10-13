@@ -151,6 +151,17 @@ test('a frame without a figure closes without a gap', () => {
   expect(top.endsWith('──╮')).toBe(true)
 })
 
+test('repo: an unknown diff is left out, a detached HEAD keeps its diff', () => {
+  const unknown = box(input({ git: { ...input().git!, files: null, added: null, removed: null } }), 'Repo')!
+  expect(unknown).toContain('me/project')
+  expect(unknown).not.toContain('+')
+  expect(unknown).not.toContain('files')
+  const detached = box(input({ git: { ...input().git!, branch: null } }), 'Repo')!
+  expect(detached).toContain('+42 −7 · 3 files')
+  const bare = box(input({ git: { ...input().git!, branch: null, repo: null } }), 'Repo')!
+  expect(bare).toContain('+42 −7 · 3 files')
+})
+
 test('a long repo name moves the diff to a row of its own, uncut', () => {
   const t = box(input({ git: { ...input().git!, repo: 'AdrienGras/claude-session-status-mod' } }), 'Repo')!
   expect(t).toContain('AdrienGras/claude-session-status-mod')

@@ -249,19 +249,17 @@ const repo = ({ git, columns }: PaneInput): Section | null => {
   if (!git) return null
   const inner = columns - FRAME
   const rows: Row[] = [{ left: [dim(tail(git.cwd, inner))] }]
-  if (git.repo || git.branch) {
-    const diff: Part[] = git.branch
-      ? [
-          { text: `+${git.added}`, color: 'diffAdded' },
-          { text: ` −${git.removed}`, color: 'diffRemoved' },
-          dim(` · ${plural(git.files, S.file)}${git.ahead !== null && git.behind !== null ? ` · ↑${git.ahead} ↓${git.behind}` : ''}`),
-        ]
+  // Each figure only when git gave it; a detached HEAD still has its diff.
+  const counts: Part[] =
+    git.files !== null && git.added !== null && git.removed !== null
+      ? [{ text: `+${git.added}`, color: 'diffAdded' }, { text: ` −${git.removed}`, color: 'diffRemoved' }, dim(` · ${plural(git.files, S.file)}`)]
       : []
-    const name: Part[] = git.repo ? [{ text: git.repo }] : []
-    // A long name would cut the diff: then each gets a row.
-    if (name.length && diff.length && len(name) + len(diff) + 1 > inner) rows.push({ left: name }, { left: [], right: diff })
-    else rows.push({ left: name, right: diff })
-  }
+  const upstream = git.ahead !== null && git.behind !== null ? [dim(`${counts.length ? ' · ' : ''}↑${git.ahead} ↓${git.behind}`)] : []
+  const diff: Part[] = [...counts, ...upstream]
+  const name: Part[] = git.repo ? [{ text: git.repo }] : []
+  // A long name would cut the diff: then each gets a row.
+  if (name.length && diff.length && len(name) + len(diff) + 1 > inner) rows.push({ left: name }, { left: [], right: diff })
+  else if (name.length || diff.length) rows.push({ left: name, right: diff })
   if (git.sessionFiles.length > 0) {
     rows.push({ left: [dim(`${S.thisSession}:`)] })
     for (const f of git.sessionFiles.slice(0, MAX_FILES)) rows.push({ left: [{ text: `  ${tail(f, inner - 2)}` }] })

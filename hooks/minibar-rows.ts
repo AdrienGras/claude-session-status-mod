@@ -60,11 +60,9 @@ const item = (key: CardLine, { usage, live, git, settings, now }: MinibarInput):
   }
   if (key === 'cost') return usage?.costUsd === undefined ? null : [{ text: fmtUsd(usage.costUsd), color: 'warning' }]
   if (!git?.branch) return null
-  return [
-    { text: ` ${git.branch}`, color: 'ide' },
-    { text: ` +${git.added}`, color: 'diffAdded' },
-    { text: ` −${git.removed}`, color: 'diffRemoved' },
-  ]
+  const branch: Part = { text: ` ${git.branch}`, color: 'ide' }
+  if (git.added === null || git.removed === null) return [branch]
+  return [branch, { text: ` +${git.added}`, color: 'diffAdded' }, { text: ` −${git.removed}`, color: 'diffRemoved' }]
 }
 
 /** The items in the person's order, separated by `│`; those past `maxCols` dropped from the right. */

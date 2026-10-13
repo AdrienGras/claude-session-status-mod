@@ -60,9 +60,9 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
       cwd,
       repo: parseRemote(info?.remote ?? null),
       branch: null,
-      files: 0,
-      added: 0,
-      removed: 0,
+      files: null,
+      added: null,
+      removed: null,
       ahead: null,
       behind: null,
       sessionFiles: [],
@@ -87,7 +87,8 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
         git('--no-optional-locks', 'status', '--porcelain', '-z'),
       ])
       snap.branch = branch?.trim() || null
-      Object.assign(snap, parseShortstat(shortstat ?? ''))
+      // A diff git could not give (no commit yet, a timeout) stays unknown: never drawn as +0 −0.
+      if (shortstat !== null) Object.assign(snap, parseShortstat(shortstat))
       const ab = parseAheadBehind(aheadBehind ?? '')
       if (ab) Object.assign(snap, ab)
       // Porcelain paths are from the top of this worktree; without it they can't be looked at.

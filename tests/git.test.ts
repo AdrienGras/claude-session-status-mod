@@ -59,7 +59,7 @@ const deps = (repo: { root: string; remote: string | null } | null, git: Git, mt
 
 test('outside a repo: the folder alone, nothing invented', async () => {
   const snap = await makeGitReader()(deps(null, {}), 0)
-  expect(snap).toEqual({ cwd: '/work/x', repo: null, branch: null, files: 0, added: 0, removed: 0, ahead: null, behind: null, sessionFiles: [] })
+  expect(snap).toEqual({ cwd: '/work/x', repo: null, branch: null, files: null, added: null, removed: null, ahead: null, behind: null, sessionFiles: [] })
 })
 
 test('in a repo without upstream: no ahead/behind; session files by mtime', async () => {
@@ -87,7 +87,7 @@ test('git that cannot run reads as no readings', async () => {
     throw new Error('ENOENT')
   }
   const snap = await makeGitReader()(d, 0)
-  expect([snap.branch, snap.ahead, snap.files]).toEqual([null, null, 0])
+  expect([snap.branch, snap.ahead, snap.files]).toEqual([null, null, null])
 })
 
 test('readings are cached within the TTL', async () => {
@@ -130,4 +130,18 @@ test('in a linked worktree, git runs in the session folder and paths join its ow
   expect([...cwds]).toEqual(['/work/wt/sub'])
   expect(snap.branch).toBe('feature')
   expect(snap.sessionFiles).toEqual(['edited.ts'])
+})
+
+test('a diff git could not read is unknown, never zero', async () => {
+  // A fresh `git init` with files: the branch reads, `diff HEAD` exits 128 (no HEAD yet).
+  const d = deps({ root: '/work/x', remote: null }, { 'branch --show-current': { exitCode: 0, stdout: 'main\n' } })
+  const snap = await makeGitReader()(d, 0)
+  expect(snap.branch).toBe('main')
+  expect([snap.files, snap.added, snap.removed]).toEqual([null, null, null])
+})
+
+test('a clean tree reads as a known zero', async () => {
+  const d = deps({ root: '/work/x', remote: null }, { 'diff --shortstat HEAD': { exitCode: 0, stdout: '' } })
+  const snap = await makeGitReader()(d, 0)
+  expect([snap.files, snap.added, snap.removed]).toEqual([0, 0, 0])
 })
