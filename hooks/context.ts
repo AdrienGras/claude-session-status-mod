@@ -1,4 +1,6 @@
 // The context window as segments, labels and the lists the pane unfolds.
+import type { SessionContextBreakdown } from 'claude-code'
+
 import { fmtTokens } from './format'
 import type { BreakdownView, Segment } from '../types'
 
@@ -44,3 +46,15 @@ export const mcpByServer = (tools: readonly { serverName: string; tokens: number
 /** Tokens left before auto-compaction runs; null when either side is unknown. */
 export const compactHeadroom = (tokens: number | undefined, threshold: number | undefined): number | null =>
   tokens === undefined || threshold === undefined ? null : Math.max(0, threshold - tokens)
+
+/** Keep only what the drawings read; the grid and skill bodies stay with the engine. */
+export const toBreakdownView = (b: SessionContextBreakdown): BreakdownView => ({
+  categories: b.categories.map(c => ({ name: c.name, tokens: c.tokens, color: c.color, kind: c.kind })),
+  memoryFiles: b.memoryFiles.map(f => ({ path: f.path, tokens: f.tokens })),
+  mcpTools: b.mcpTools.map(t => ({ name: t.name, serverName: t.serverName, tokens: t.tokens })),
+  agents: b.agents.map(a => ({ agentType: a.agentType, tokens: a.tokens })),
+  skills: b.skills && { totalSkills: b.skills.totalSkills, tokens: b.skills.tokens },
+  autoCompactThreshold: b.autoCompactThreshold,
+  isAutoCompactEnabled: b.isAutoCompactEnabled,
+  autocompactSource: b.autocompactSource,
+})

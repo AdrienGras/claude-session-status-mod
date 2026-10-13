@@ -4,8 +4,10 @@ import { atom, read } from 'claude-code'
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import type { GitSnapshot, Receipt } from '../types'
 import { registerCard } from './card'
+import { PANE_ID, registerPane } from './pane'
 import { debugReport } from './debug'
 import { normalizeSettings } from './settings'
+import { S } from './strings'
 import { registerTracking } from './track'
 
 const liveAtom = atom({ plugin: 'session-status', key: 'live' } as const, EMPTY_LIVE)
@@ -17,6 +19,7 @@ const settingsAtom = atom({ plugin: 'session-status', key: 'settings' } as const
 export const register: Register = on => {
   registerTracking(on)
   registerCard(on)
+  registerPane(on)
 
   on('command.run', { command: 'sst' }, async ($, e) => {
     const args = e.args.trim()
@@ -31,6 +34,12 @@ export const register: Register = on => {
       })
       return { text: JSON.stringify(dump, null, 2) }
     }
-    return { text: '' }
+    // Bare /sst: the pane, open or closed.
+    if ((await $.ui.panes()).some(p => p.id === PANE_ID)) {
+      await $.ui.close({ id: PANE_ID })
+      return { text: S.paneClosed }
+    }
+    await $.ui.open({ id: PANE_ID, title: S.paneTitle })
+    return { text: S.paneOpened }
   })
 }

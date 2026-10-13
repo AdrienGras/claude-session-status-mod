@@ -10,6 +10,7 @@ export type FakeEngine = {
   openPanes: Set<string>
   commands: string[]
   clock: MockClock
+  usageCalls: unknown[]
 }
 
 export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine => {
@@ -25,13 +26,14 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     openPanes: new Set(),
     commands: [],
     clock: mock.clock(on),
+    usageCalls: [],
   }
   mock.store(on)
   on('session.cwd', () => ({ value: '/work/x' }))
   on('session.repo', () => ({ value: null }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => (fake.commands.push(e.name), { value: { command: e.name } }))
-  on('session.usage', () => ({ value: fake.usage }))
+  on('session.usage', (_$, e) => (fake.usageCalls.push(e), { value: fake.usage }))
   on('session.model', () => ({ value: fake.model }))
   on('session.turns', () => ({ value: fake.turns }))
   on('ui.open', (_$, e) => (fake.openPanes.add(e.id), { value: { isPlaced: true } }))
@@ -62,3 +64,12 @@ export const modState = async ($: { command: { run: (e: never) => Promise<unknow
     receipt: { edits: number; errors: number; agents: number; isRunning: boolean } | null
   }
 }
+
+/** The side pane as a surface mounts it. */
+export const paneTarget = (bodyColumns = 48, placement: 'dock' | 'inline' = 'dock') => ({
+  plugin: 'session-status',
+  component: 'Pane' as const,
+  requestId: 'sst',
+  props: { title: 'Session', isFocused: true, bodyColumns, placement, scroll: { offset: 0, bodyRows: 80 }, view: {} },
+  surface: 'terminal' as const,
+})

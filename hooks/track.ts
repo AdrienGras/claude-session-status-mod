@@ -1,13 +1,14 @@
 // Session lifecycle and events → state atoms. Every hook observes and hands back what is beneath unchanged.
-import type { EngineInterface, On, SessionContextBreakdown } from 'claude-code'
+import type { EngineInterface, On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
+import { toBreakdownView } from './context'
 import { makeGitReader } from './git'
 import { stepSpeed } from './session'
 import { normalizeSettings, SETTINGS_KEY } from './settings'
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import { S as STR } from './strings'
-import type { BreakdownView, GitSnapshot, Receipt, UsageView } from '../types'
+import type { GitSnapshot, Receipt, UsageView } from '../types'
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit'])
 
@@ -165,15 +166,3 @@ export const registerTracking = (on: On): void => {
     return r
   })
 }
-
-/** Keep only what the drawings read; the grid and skill bodies stay with the engine. */
-const toBreakdownView = (b: SessionContextBreakdown): BreakdownView => ({
-  categories: b.categories.map(c => ({ name: c.name, tokens: c.tokens, color: c.color, kind: c.kind })),
-  memoryFiles: b.memoryFiles.map(f => ({ path: f.path, tokens: f.tokens })),
-  mcpTools: b.mcpTools.map(t => ({ name: t.name, serverName: t.serverName, tokens: t.tokens })),
-  agents: b.agents.map(a => ({ agentType: a.agentType, tokens: a.tokens })),
-  skills: b.skills && { totalSkills: b.skills.totalSkills, tokens: b.skills.tokens },
-  autoCompactThreshold: b.autoCompactThreshold,
-  isAutoCompactEnabled: b.isAutoCompactEnabled,
-  autocompactSource: b.autocompactSource,
-})
