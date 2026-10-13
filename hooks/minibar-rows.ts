@@ -1,6 +1,7 @@
 // The status line under the prompt: the person's items, one line, cut to the room it has.
 import { lineBar, segmentBar, burnBar } from './bars'
-import { computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
+import { cellWidth } from './cells'
+import { contextTone, projectionText, projectionTone, readQuota } from './burn'
 import { contextFigure, contextLabel, toSegments } from './context'
 import { fmtUsd } from './format'
 import { cellsToParts, prettyModel } from './parts'
@@ -10,38 +11,38 @@ import type { CardLine, GitSnapshot, Live, RateLimit, Settings, UsageView } from
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const SEP: Part = { text: ' │ ', color: 'subtle' }
-const WINDOW_LABEL: Record<string, string> = { five_hour: '5h', seven_day: '7d' }
 
 export type MinibarInput = { usage: UsageView | null; live: Live; git: GitSnapshot | null; settings: Settings; now: number }
 
-const width = (parts: Part[]) => parts.reduce((a, p) => a + [...p.text].length, 0)
+const width = (parts: Part[]) => parts.reduce((a, p) => a + cellWidth(p.text), 0)
 
 const model = (live: Live): Part[] | null => {
   if (!live.model) return null
   const parts: Part[] = [{ text: prettyModel(live.model), color: 'claude', bold: true }]
-  const n = live.effort ? EFFORTS.indexOf(live.effort) + 1 : 0
-  if (n > 0) parts.push({ text: ` ${'▮'.repeat(n)}${'▯'.repeat(EFFORTS.length - n)}`, color: 'claude' })
+  if (!live.effort) return parts
+  const n = EFFORTS.indexOf(live.effort) + 1
+  // A level the notches don't know (a number) as its word, as the pane shows it.
+  parts.push({ text: n > 0 ? ` ${'▮'.repeat(n)}${'▯'.repeat(EFFORTS.length - n)}` : ` ${live.effort}`, color: 'claude' })
   return parts
 }
 
 const context = (usage: UsageView, w: number): Part[] => {
   const figure = contextFigure(usage)
   const label = contextLabel(figure.tokens, usage.window, figure.isEstimate)
-  if (label.pct === null) return [{ text: `ctx ${S.ctxPending}`, dim: true }]
+  if (label.pct === null) return [{ text: `${S.ctx} ${S.ctxPending}`, dim: true }]
   const tone = figure.isEstimate ? 'inactive' : contextTone(label.pct)
   const bar = usage.breakdown
     ? segmentBar(toSegments(usage.breakdown, figure.tokens, usage.window), usage.window, w)
     : lineBar(label.pct / 100, w, tone)
-  return [{ text: 'ctx ', dim: true }, ...cellsToParts(bar), { text: ` ${figure.isEstimate ? '≈' : ''}${label.pct}%`, color: tone }]
+  return [{ text: `${S.ctx} `, dim: true }, ...cellsToParts(bar), { text: ` ${figure.isEstimate ? '≈' : ''}${label.pct}%`, color: tone }]
 }
 
 /** `5h ━━──┊──── 20% → 40% ✓`: the verdict as its glyph alone; a plain gauge without a reset time. */
 const quota = (r: RateLimit, w: number, now: number): Part[] => {
-  const label: Part = { text: `${WINDOW_LABEL[r.kind] ?? r.kind} `, dim: true }
+  const label: Part = { text: `${S.windowLabel[r.kind] ?? r.kind} `, dim: true }
   const used = `${Math.round(r.percentUsed)}%`
-  const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
-  const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
-  const burn = duration && Number.isFinite(resetsAt) ? computeBurn(r.percentUsed, resetsAt, duration, now) : null
+  const burn = readQuota(r, now)
+  if (burn === 'stale') return [label, { text: '—', dim: true }]
   if (!burn) {
     const tone = contextTone(r.percentUsed)
     return [label, ...cellsToParts(lineBar(r.percentUsed / 100, w, tone)), { text: ` ${used}`, color: tone }]
@@ -60,11 +61,9 @@ const item = (key: CardLine, { usage, live, git, settings, now }: MinibarInput):
   }
   if (key === 'cost') return usage?.costUsd === undefined ? null : [{ text: fmtUsd(usage.costUsd), color: 'warning' }]
   if (!git?.branch) return null
-  return [
-    { text: ` ${git.branch}`, color: 'ide' },
-    { text: ` +${git.added}`, color: 'diffAdded' },
-    { text: ` −${git.removed}`, color: 'diffRemoved' },
-  ]
+  const branch: Part = { text: ` ${git.branch}`, color: 'ide' }
+  if (git.added === null || git.removed === null) return [branch]
+  return [branch, { text: ` +${git.added}`, color: 'diffAdded' }, { text: ` −${git.removed}`, color: 'diffRemoved' }]
 }
 
 /** The items in the person's order, separated by `│`; those past `maxCols` dropped from the right. */
@@ -85,8 +84,11 @@ const LEAD: Part = { text: '  │ ', color: 'subtle' }
 /** Columns kept for the line's padding and the open mark. */
 const RESERVED = 6
 
-/** The status as drawn after a hint `hintWidth` wide on a `columns`-wide row; empty when nothing fits. */
+/** The status as drawn after a hint `hintWidth` cells wide on a `columns`-wide row; empty when nothing fits. */
 export const minibarLine = (input: MinibarInput, hintWidth: number, columns: number): Part[] => {
   const parts = minibarParts(input, columns - hintWidth - RESERVED - width([LEAD]))
   return parts.length ? [LEAD, ...parts] : []
 }
+
+/** The status on a row of its own, under the engine's hint: the whole row, no lead. */
+export const minibarRow = (input: MinibarInput, columns: number): Part[] => minibarParts(input, columns - RESERVED)

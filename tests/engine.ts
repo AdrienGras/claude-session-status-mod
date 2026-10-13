@@ -1,5 +1,5 @@
 // A stand-in for the engine beneath the plugin, shared by the integration tests.
-import type { On, SessionUsage } from 'claude-code'
+import type { On, SessionUsage, TurnCompleteInput } from 'claude-code'
 import { mock } from 'claude-code/testing'
 import type { MockClock } from 'claude-code/testing'
 
@@ -8,9 +8,14 @@ export type FakeEngine = {
   model: string
   turns: number
   openPanes: Set<string>
+  /** Open panes that are a tab behind another (isShown false), until opened with focus. */
+  hiddenPanes: Set<string>
   commands: string[]
+  commandSpecs: { name: string; immediate?: true }[]
   clock: MockClock
   usageCalls: unknown[]
+  /** Usage reads refused before the next one answers (an engine not ready yet). */
+  usageFailures: number
   repo: { root: string; remote: string | null } | null
 }
 
@@ -25,29 +30,54 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     model: 'Opus 5.5',
     turns: 0,
     openPanes: new Set(),
+    hiddenPanes: new Set(),
     commands: [],
+    commandSpecs: [],
     clock: mock.clock(on),
     usageCalls: [],
+    usageFailures: 0,
     repo: null,
   }
   mock.store(on)
   on('session.cwd', () => ({ value: '/work/x' }))
   on('session.repo', () => ({ value: fake.repo && { ...fake.repo, internal: false, name: null } }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', (_$, e) => (fake.commands.push(e.name), { value: { command: e.name } }))
-  on('session.usage', (_$, e) => (fake.usageCalls.push(e), { value: fake.usage }))
+  on('command.register', (_$, e) => {
+    fake.commands.push(e.name)
+    fake.commandSpecs.push(e)
+    return { value: { command: e.name } }
+  })
+  on('session.usage', (_$, e) => {
+    fake.usageCalls.push(e)
+    if (fake.usageFailures > 0) {
+      fake.usageFailures -= 1
+      throw new Error('usage not ready')
+    }
+    return { value: fake.usage }
+  })
   on('session.model', () => ({ value: fake.model }))
   on('session.turns', () => ({ value: fake.turns }))
-  on('ui.open', (_$, e) => (fake.openPanes.add(e.id), { value: { isPlaced: true } }))
-  on('ui.close', (_$, e) => (fake.openPanes.delete(e.id), { value: undefined }))
+  on('ui.open', (_$, e) => {
+    fake.openPanes.add(e.id)
+    if (e.focus) fake.hiddenPanes.delete(e.id)
+    return { value: { isPlaced: true } }
+  })
+  on('ui.close', (_$, e) => {
+    fake.openPanes.delete(e.id)
+    fake.hiddenPanes.delete(e.id)
+    return { value: undefined }
+  })
   on('ui.panes', () => ({
-    value: [...fake.openPanes].map(id => ({ id, title: id, isShown: true, isFocused: false, isPlaced: true })) as never,
+    value: [...fake.openPanes].map(id => ({ id, title: id, isShown: !fake.hiddenPanes.has(id), isFocused: false, isPlaced: true })) as never,
   }))
   return fake
 }
 
 export const startSession = ($: { session: { start: (e: never) => Promise<unknown> } }) =>
   $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+
+/** A main-loop turn that answered, as the engine raises its end. */
+export const answered = (turnId: string): TurnCompleteInput => ({ turnId, reason: 'answer', answer: '', isAborted: false, durationMs: 1_000 })
 
 // What the engine stamps on a typed slash command.
 export const typed = (command: string, args = '') => ({
@@ -64,7 +94,7 @@ export const modState = async ($: { command: { run: (e: never) => Promise<unknow
     live: { model: string | null; effort: string | null; isWorking: boolean; requests: number; speed: unknown }
     counters: { compactions: number; tools: Record<string, number>; subagents: number }
     receipt: { edits: number; errors: number; agents: number; isRunning: boolean } | null
-    settings: { cardLines: string[]; barWidth: number }
+    settings: { cardLines: string[]; barWidth: number; hintLayout: string }
   }
 }
 

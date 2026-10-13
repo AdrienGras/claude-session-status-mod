@@ -61,3 +61,12 @@ test('the debug report keeps the figures a bug report needs', () => {
   expect(r.mod.counters.tools).toEqual({ Edit: 2, mcp: 1 })
   expect(r.mod.git).toEqual({ inRepo: true, hasRemote: true, hasBranch: true, files: 3, added: 10, removed: 2, ahead: 1, behind: 0, sessionFiles: 1 })
 })
+
+test('a configured model id that is no Claude model name is not printed', () => {
+  const arn = 'arn:aws:bedrock:eu-west-3:123456789012:application-inference-profile/abc123'
+  const text = JSON.stringify(debugReport(usage, { ...mod, live: { ...mod.live, model: arn } }))
+  for (const secret of ['123456789012', 'abc123', 'arn:']) expect(text).not.toContain(secret)
+  expect(debugReport(usage, mod).mod.live.model).toBe('claude-opus-5-5')
+  const bedrock = { ...mod, live: { ...mod.live, model: 'eu.anthropic.claude-opus-5-5-v1:0' } }
+  expect(debugReport(usage, bedrock).mod.live.model).toBe('claude-opus-5-5-v1')
+})

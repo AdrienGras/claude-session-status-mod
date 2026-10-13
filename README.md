@@ -40,6 +40,8 @@ One line under the prompt, right where Claude Code draws its hint (which stays o
 
 Want more? The **7d window**, **session cost** and **branch & diff** are one `/sst config` away. Pick your items, reorder them, resize the bars. Whatever doesn't fit your terminal is dropped from the right, and `◨` opens the side pane.
 
+**One row or two?** By default the status line shares its row with Claude Code's hint, which it redraws as plain dim text. Prefer to keep Claude Code's line exactly as it draws it (the coloured permission mode, the clickable task pills, other mods' additions)? Switch **Layout** to *own row* in `/sst config`: the hint keeps its row and the status line takes the one under it.
+
 ### The side pane
 
 `/sst` toggles it. In fullscreen at 110+ columns it docks beside the transcript; otherwise it opens above the prompt.
@@ -61,7 +63,7 @@ At the bottom: **compact** runs `/compact` (after asking 🙏), **recount** coun
 | Command | Does |
 | --- | --- |
 | `/sst` | open or close the side pane |
-| `/sst config` | choose what the status line shows, in which order, and how wide the bars are (6–24) |
+| `/sst config` | choose what the status line shows, in which order, how wide the bars are (6–24), and whether it shares the hint's row or has its own |
 | `/sst debug` | print what the mod sees, for a bug report |
 
 🐛 `/sst debug` prints figures and categories only: no path, MCP server, agent, skill, repo or branch name. Paste it in an issue without a second thought.

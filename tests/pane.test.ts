@@ -32,18 +32,27 @@ test('a full count runs on the recount button only', async ($, on) => {
   await ui.unmount()
 })
 
-test('compact asks first, then runs /compact', async ($, on) => {
+test('compact asks first, then runs /compact; cancelled or dismissed, nothing runs', async ($, on) => {
   fakeEngine(on)
   const ran: string[] = []
+  let answer: string | null = 'Compact'
   on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
+    ran.push('ask')
     const question = String(e.questions[0]?.question)
-    return { result: { questions: [], answers: { [question]: 'Compact' } } } as never
+    if (answer === null) throw new Error('dismissed')
+    return { result: { questions: [], answers: { [question]: answer } } } as never
   })
   on('command.run', { command: 'compact' }, (_$, e) => (ran.push(e.command), { text: '' }))
   await startSession($)
   const ui = await $.ui.mount(paneTarget())
   await ui.press({ key: 'compact' })
-  expect(ran).toEqual(['compact'])
+  expect(ran).toEqual(['ask', 'compact'])
+  ran.length = 0
+  answer = 'Cancel'
+  await ui.press({ key: 'compact' })
+  answer = null
+  await ui.press({ key: 'compact' })
+  expect(ran).toEqual(['ask', 'ask'])
   await ui.unmount()
 })
 
@@ -54,4 +63,40 @@ test('/sst toggles the pane', async ($, on) => {
   expect(fake.openPanes.has('sst')).toBe(true)
   await $.command.run(typed('sst'))
   expect(fake.openPanes.has('sst')).toBe(false)
+})
+
+test('/sst brings back a pane hidden behind another tab instead of closing it', async ($, on) => {
+  const fake = fakeEngine(on)
+  await startSession($)
+  await $.command.run(typed('sst'))
+  fake.hiddenPanes.add('sst')
+  const out = (await $.command.run(typed('sst'))) as { text: string }
+  expect(out.text).toBe('Session pane opened.')
+  expect(fake.openPanes.has('sst')).toBe(true)
+  expect(fake.hiddenPanes.has('sst')).toBe(false)
+})
+
+test("the engine's breakdown reaches the Context box", async ($, on) => {
+  const fake = fakeEngine(on, {
+    context: {
+      tokens: 140_000,
+      window: 1_000_000,
+      percent: 14,
+      breakdown: {
+        categories: [{ name: 'Messages', tokens: 120_000, color: 'claude', kind: 'used', isDeferred: false }],
+        memoryFiles: [{ path: '/w/CLAUDE.md', type: 'Project', tokens: 2_000 }],
+        mcpTools: [],
+        agents: [],
+        gridRows: [],
+        isAutoCompactEnabled: true,
+        autoCompactThreshold: 900_000,
+      },
+    } as never,
+  })
+  await startSession($)
+  await fake.clock.settle()
+  const ui = await $.ui.mount(paneTarget())
+  expect(await ui.find({ text: /Messages/ })).toBeDefined()
+  expect(await ui.find({ text: /memory 1/ })).toBeDefined()
+  await ui.unmount()
 })

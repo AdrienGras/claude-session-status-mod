@@ -19,16 +19,21 @@ export const parseAheadBehind = (out: string): { ahead: number; behind: number }
   return m ? { behind: Number(m[1]), ahead: Number(m[2]) } : null
 }
 
-/** Paths from `git status --porcelain`; a rename reads as its destination. */
-export const parsePorcelain = (out: string): string[] =>
-  out
-    .split('\n')
-    .filter(line => line.length > 3)
-    .map(line => {
-      const path = line.slice(3)
-      const dest = path.includes(' -> ') ? path.split(' -> ').pop()! : path
-      return dest.replace(/^"(.*)"$/, '$1')
-    })
+/**
+ * Paths from `git status --porcelain -z`, as written (no C-quoting under -z): `XY path`, NUL
+ * ended; a rename or copy is followed by its source, a field of its own, skipped.
+ */
+export const parsePorcelain = (out: string): string[] => {
+  const fields = out.split('\0')
+  const paths: string[] = []
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]!
+    if (entry.length <= 3) continue
+    paths.push(entry.slice(3))
+    if (/[RC]/.test(entry.slice(0, 2))) i++
+  }
+  return paths
+}
 
 /** The part of `$` the reader uses: the engine's, or a test's. */
 export type GitDeps = {
@@ -42,51 +47,58 @@ const TTL_MS = 5_000
 /** Dirty paths looked at for the session's own files: a huge worktree is not walked whole. */
 const MAX_STATS = 200
 
-/** A reader that runs `git` at most once per TTL; the snapshot in between is the cached one. */
+/** A reader that runs `git` at most once per TTL and conversation; the snapshot in between is the cached one. */
 export const makeGitReader = (ttlMs = TTL_MS) => {
-  let cached: { at: number; snap: GitSnapshot } | null = null
+  let cached: { at: number; startedAt: number; snap: GitSnapshot } | null = null
 
   return async ($: GitDeps, startedAt: number): Promise<GitSnapshot> => {
     const now = await $.clock.now()
-    if (cached && now - cached.at < ttlMs) return cached.snap
+    // The session files are measured against startedAt: a new conversation is a new reading.
+    if (cached?.startedAt === startedAt && now - cached.at < ttlMs) return cached.snap
     const cwd = await $.session.cwd()
     const info = await $.session.repo()
     const snap: GitSnapshot = {
       cwd,
       repo: parseRemote(info?.remote ?? null),
       branch: null,
-      files: 0,
-      added: 0,
-      removed: 0,
+      files: null,
+      added: null,
+      removed: null,
       ahead: null,
       behind: null,
       sessionFiles: [],
     }
     if (info) {
+      // In the session's folder, not `info.root`: that is the main working tree's, even from a
+      // linked worktree, whose branch and changes are its own.
       const git = async (...args: string[]): Promise<string | null> => {
         try {
-          const r = await $.process.run(['git', ...args], { cwd: info.root, timeoutMs: 3_000 })
+          const r = await $.process.run(['git', ...args], { cwd, timeoutMs: 3_000 })
           return r.exitCode === 0 ? r.stdout : null
         } catch {
           return null
         }
       }
-      const [branch, shortstat, aheadBehind, status] = await Promise.all([
+      const [top, branch, shortstat, aheadBehind, status] = await Promise.all([
+        git('rev-parse', '--show-toplevel'),
         git('branch', '--show-current'),
         git('diff', '--shortstat', 'HEAD'),
         git('rev-list', '--left-right', '--count', '@{u}...HEAD'),
         // Read-only: never take the index lock while the person's own git runs.
-        git('--no-optional-locks', 'status', '--porcelain'),
+        git('--no-optional-locks', 'status', '--porcelain', '-z'),
       ])
       snap.branch = branch?.trim() || null
-      Object.assign(snap, parseShortstat(shortstat ?? ''))
+      // A diff git could not give (no commit yet, a timeout) stays unknown: never drawn as +0 −0.
+      if (shortstat !== null) Object.assign(snap, parseShortstat(shortstat))
       const ab = parseAheadBehind(aheadBehind ?? '')
       if (ab) Object.assign(snap, ab)
-      const paths = parsePorcelain(status ?? '').slice(0, MAX_STATS)
+      // Porcelain paths are from the top of this worktree; without it they can't be looked at.
+      const root = top?.trim()
+      const paths = root ? parsePorcelain(status ?? '').slice(0, MAX_STATS) : []
       const fresh = await Promise.all(
         paths.map(async path => {
           try {
-            return (await $.fs.stat(`${info.root}/${path}`)).mtimeMs >= startedAt
+            return (await $.fs.stat(`${root}/${path}`)).mtimeMs >= startedAt
           } catch {
             return false // deleted or unreadable: not a file this session left behind
           }
@@ -94,7 +106,7 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
       )
       snap.sessionFiles = paths.filter((_, i) => fresh[i])
     }
-    cached = { at: now, snap }
+    cached = { at: now, startedAt, snap }
     return snap
   }
 }

@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
+import { cellWidth } from '../hooks/cells'
 import { fitLine, paneRows } from '../hooks/pane-rows'
 import type { PaneInput } from '../hooks/pane-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
@@ -33,7 +34,7 @@ const input = (over: Partial<PaneInput> = {}): PaneInput => ({
         { name: 'b', serverName: 'github', tokens: 100 },
       ],
       agents: [{ agentType: 'Explore', tokens: 90 }],
-      skills: { totalSkills: 3, tokens: 1_200 },
+      skills: { totalSkills: 3, tokens: 1_200, items: [{ name: 'review', tokens: 300 }, { name: 'deploy', tokens: 900 }] },
       autoCompactThreshold: 160_000,
       isAutoCompactEnabled: true,
       autocompactSource: 'model-default',
@@ -77,8 +78,20 @@ test('every row spans the pane exactly, however long its content', () => {
       git: { ...input().git!, cwd: `/srv/${'very-long-directory/'.repeat(6)}x`, sessionFiles: [`${'deep/'.repeat(20)}file.ts`] },
       expanded: ['memory', 'mcp', 'agents'],
     })
-    for (const r of all(long)) expect([...r].length).toBe(columns)
+    for (const r of all(long)) expect(cellWidth(r)).toBe(columns)
   }
+})
+
+test('every row spans the pane in cells, with wide glyphs and a long branch', () => {
+  const wide = input({
+    usage: { ...input().usage!, rateLimits: [{ kind: 'five_hour', percentUsed: 100, resetsAt: iso(NOW + H) }] },
+    git: { ...input().git!, cwd: '/srv/プロジェクト/日本語のフォルダ/もっと長い名前', branch: 'dependabot/npm_and_yarn/typescript-5.9.3', sessionFiles: ['ドキュメント/会議.md'] },
+  })
+  const rows = all(wide)
+  expect(rows.join('\n')).toContain('⛔')
+  for (const r of rows) expect(cellWidth(r)).toBe(48)
+  const top = rows.find(r => r.startsWith('╭─ Repo'))!
+  expect(top.endsWith('─╮')).toBe(true)
 })
 
 test('header: model and state in the frame, effort, mode, requests, speed, window', () => {
@@ -110,8 +123,19 @@ test('context lists unfold on demand, two to a row', () => {
   const rows = paneRows(input()).filter(r => r.kind === 'groups')
   expect(rows.length).toBe(2)
   expect(rows.flatMap(r => (r.kind === 'groups' ? r.groups.map(g => g.key) : []))).toEqual(['memory', 'mcp', 'skills', 'agents'])
-  expect(all(input()).join('\n')).toContain('▸ MCP 1 · 1k')
+  expect(all(input()).join('\n')).toContain('▸ MCP 1 · 800')
   expect(all(input({ expanded: ['mcp'] })).join('\n')).toContain('github')
+})
+
+test('the skills list unfolds onto its skills, the biggest first', () => {
+  const t = all(input({ expanded: ['skills'] })).join('\n')
+  expect(t.indexOf('deploy') >= 0 && t.indexOf('deploy') < t.indexOf('review')).toBe(true)
+  const many = Array.from({ length: 14 }, (_, i) => ({ name: `skill-${i}`, tokens: 100 - i }))
+  const usage = input().usage!
+  const long = all(input({ expanded: ['skills'], usage: { ...usage, breakdown: { ...usage.breakdown!, skills: { totalSkills: 14, tokens: 1_309, items: many } } } })).join('\n')
+  expect(long).toContain('skill-9')
+  expect(long).not.toContain('skill-10')
+  expect(long).toContain('+4 more')
 })
 
 test('quotas: used, projection and verdict, then the reset; no box without windows', () => {
@@ -119,6 +143,15 @@ test('quotas: used, projection and verdict, then the reset; no box without windo
   for (const s of [' 20%', '→ 40% ✓ +7h30', '⧗2h30']) expect(t).toContain(s)
   expect(t).toMatch(/resets \d\d:\d\d/)
   expect(box(input({ usage: { ...input().usage!, rateLimits: [] } }), 'Quotas')).toBe(undefined)
+})
+
+test('a window read before its reset shows no figure until the next reply', () => {
+  const stale = { kind: 'five_hour', percentUsed: 80, resetsAt: iso(NOW - 60_000) }
+  const t = box(input({ usage: { ...input().usage!, rateLimits: [stale] } }), 'Quotas')!
+  expect(t).not.toContain('80%')
+  expect(t).not.toContain('→')
+  expect(t).toContain('5h —')
+  expect(t).toContain('reset; figures with the next reply')
 })
 
 test('a spend limit past 100% is a plain gauge with its real value', () => {
@@ -149,6 +182,17 @@ test('a frame without a figure closes without a gap', () => {
   const top = all(input()).find(r => r.startsWith('╭─ Quotas'))!
   expect(top).not.toContain('─ ─')
   expect(top.endsWith('──╮')).toBe(true)
+})
+
+test('repo: an unknown diff is left out, a detached HEAD keeps its diff', () => {
+  const unknown = box(input({ git: { ...input().git!, files: null, added: null, removed: null } }), 'Repo')!
+  expect(unknown).toContain('me/project')
+  expect(unknown).not.toContain('+')
+  expect(unknown).not.toContain('files')
+  const detached = box(input({ git: { ...input().git!, branch: null } }), 'Repo')!
+  expect(detached).toContain('+42 −7 · 3 files')
+  const bare = box(input({ git: { ...input().git!, branch: null, repo: null } }), 'Repo')!
+  expect(bare).toContain('+42 −7 · 3 files')
 })
 
 test('a long repo name moves the diff to a row of its own, uncut', () => {

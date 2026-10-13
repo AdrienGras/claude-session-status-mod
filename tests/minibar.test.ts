@@ -1,6 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
-import { minibarLine, minibarParts } from '../hooks/minibar-rows'
+import { cellWidth } from '../hooks/cells'
+import { minibarLine, minibarParts, minibarRow } from '../hooks/minibar-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE } from '../hooks/state'
 import type { UsageView } from '../types'
@@ -72,4 +73,40 @@ test('items that do not fit are dropped from the right', () => {
   expect(narrow.startsWith('Opus 5.5 ▮▮▮▯▯')).toBe(true)
   expect(narrow).not.toContain('5h')
   expect(bar({}, 5)).toBe('')
+})
+
+test('on a row of its own, no lead and the whole width', () => {
+  const input = { usage, live, git: null, settings: DEFAULT_SETTINGS, now: NOW }
+  const row = text(minibarRow(input, 200))
+  expect(row.startsWith('Opus 5.5')).toBe(true)
+  expect(row).toBe(bar())
+  expect(text(minibarRow(input, 30))).toBe('Opus 5.5 ▮▮▮▯▯')
+  expect(minibarRow(input, 10)).toEqual([])
+})
+
+const git = { cwd: '/w', repo: null, branch: 'main', files: 1, added: 3, removed: 1, ahead: null, behind: null, sessionFiles: [] }
+
+test('branch & diff, the diff left out when unknown', () => {
+  const settings = { ...DEFAULT_SETTINGS, cardLines: ['repo' as const] }
+  expect(bar({ settings, git })).toBe(' main +3 −1')
+  expect(bar({ settings, git: { ...git, files: null, added: null, removed: null } })).toBe(' main')
+})
+
+test('a window read before its reset shows no figure', () => {
+  const stale = { ...usage, rateLimits: [{ kind: 'five_hour', percentUsed: 80, resetsAt: iso(NOW - 60_000) }] }
+  const t = bar({ usage: stale })
+  expect(t).not.toContain('80%')
+  expect(t.endsWith('5h —')).toBe(true)
+})
+
+test('the budget counts cells: a wide ⛔ does not run past it', () => {
+  const full = { ...usage, rateLimits: [{ kind: 'five_hour', percentUsed: 100, resetsAt: iso(NOW + H) }] }
+  const all = bar({ usage: full })
+  expect(all).toContain('⛔')
+  const codePoints = [...all].length
+  expect(cellWidth(bar({ usage: full }, codePoints)) <= codePoints).toBe(true)
+})
+
+test('an effort level with no notches shows as its word, as in the pane', () => {
+  expect(bar({ live: { ...live, effort: '7' }, settings: { ...DEFAULT_SETTINGS, cardLines: ['model'] } })).toBe('Opus 5.5 7')
 })

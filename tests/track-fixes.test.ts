@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import { fakeEngine, modState, startSession } from './engine'
+import { answered, fakeEngine, modState, startSession } from './engine'
 
 const messages = [{ role: 'user', text: 'x', toolUses: [] }]
 const usage = { input_tokens: 1, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
@@ -47,6 +47,7 @@ test('the first turn after /clear keeps its counts when the new figures arrive',
   await $.tool.call({ tool: 'Read', input: {}, tool_use_id: 'u1' } as never)
   fake.usage = { ...fake.usage, startedAt: 1 }
   await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  await fake.clock.settle()
   expect((await modState($)).counters.tools).toEqual({ Read: 1 })
 })
 
@@ -82,7 +83,7 @@ test('git runs after the turn is handed back, not inside it', async ($, on) => {
   await fake.clock.advance(10_000)
   runs.length = 0
   await $.turn.start({ text: 'go', turnId: 'T1' })
-  await $.turn.complete({ turnId: 'T1', reason: 'end_turn', answer: '', text: '', isAborted: false } as never)
+  await $.turn.complete(answered('T1'))
   expect(runs).toEqual([])
   await fake.clock.advance(10)
   expect(runs.some(r => r.includes('status'))).toBe(true)
@@ -95,4 +96,91 @@ test('the drawings are refreshed while nothing else moves', async ($, on) => {
   await startSession($)
   await fake.clock.advance(60_000)
   expect(redraws >= 2).toBe(true)
+})
+
+test('counts made after /clear survive a later module start (a reload)', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  await startSession($)
+  await fake.clock.set(1_000)
+  await $.session.end({ reason: 'clear', sessionId: 's' } as never)
+  // The engine stamps the new conversation after the session.end chain.
+  fake.usage = { ...fake.usage, startedAt: 1_001 }
+  await $.tool.call({ tool: 'Read', input: {}, tool_use_id: 'u1' } as never)
+  await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  await fake.clock.settle()
+  await startSession($)
+  expect((await modState($)).counters.tools).toEqual({ Read: 1 })
+})
+
+test('/clear re-reads the figures and git for the new conversation', async ($, on) => {
+  const fake = fakeEngine(on)
+  fake.repo = { root: '/work/x', remote: null }
+  engineTurns(on)
+  const runs: string[] = []
+  on('process.run', (_$, e) => (runs.push(e.argv.join(' ')), { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  await startSession($)
+  await fake.clock.settle()
+  const calls = fake.usageCalls.length
+  runs.length = 0
+  await $.session.end({ reason: 'clear', sessionId: 's' } as never)
+  fake.usage = { ...fake.usage, startedAt: 1 }
+  await fake.clock.settle()
+  expect(fake.usageCalls.length > calls).toBe(true)
+  // Within the git cache's TTL, but for a new conversation: read again.
+  expect(runs.some(r => r.includes('status'))).toBe(true)
+})
+
+test('the redraw is armed even when the first usage read fails', async ($, on) => {
+  const fake = fakeEngine(on)
+  fake.usageFailures = 1
+  let redraws = 0
+  on('ui.invalidate', () => ((redraws += 1), { value: undefined }))
+  await startSession($)
+  await fake.clock.advance(60_000)
+  expect(fake.usageCalls.length >= 2).toBe(true)
+  expect(redraws >= 2).toBe(true)
+})
+
+test('a measure is handed back before the figures are re-read', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  await startSession($)
+  await fake.clock.settle()
+  const calls = fake.usageCalls.length
+  await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  expect(fake.usageCalls.length).toBe(calls)
+  await fake.clock.settle()
+  expect(fake.usageCalls.length).toBe(calls + 1)
+})
+
+test('while a turn runs, the drawings tick every second; after it, they rest', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  let redraws = 0
+  on('ui.invalidate', () => ((redraws += 1), { value: undefined }))
+  await startSession($)
+  await fake.clock.settle()
+  redraws = 0
+  await $.turn.start({ text: 'go', turnId: 'T1' })
+  await fake.clock.advance(5_000)
+  expect(redraws >= 4).toBe(true)
+  await $.turn.complete(answered('T1'))
+  redraws = 0
+  await fake.clock.advance(5_000)
+  expect(redraws).toBe(0)
+})
+
+test("a turn's cost lands on its own receipt, not the next turn's", async ($, on) => {
+  const fake = fakeEngine(on, { cost: { usd: 1 } } as never)
+  engineTurns(on)
+  await startSession($)
+  await fake.clock.settle()
+  await $.turn.start({ text: 'one', turnId: 'T1' })
+  fake.usage = { ...fake.usage, cost: { usd: 1.5 } } as never
+  await $.turn.complete(answered('T1'))
+  // The next prompt goes in before T1's figures are read.
+  await $.turn.start({ text: 'two', turnId: 'T2' })
+  await fake.clock.settle()
+  expect((await modState($)).receipt).toMatchObject({ isRunning: true, costAddedUsd: null })
 })

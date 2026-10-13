@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from '../hooks/burn'
+import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, readQuota, WINDOW_MS } from '../hooks/burn'
 
 const NOW = 1_000_000_000
 const H = 3_600_000
@@ -61,8 +61,20 @@ test('F: weekly window', () => {
   near(b.juiceMs, 1_012_382_610, 2000)
 })
 
-test('G: a reset already past still computes', () => {
-  expect(computeBurn(50, NOW - 10_000, SESSION, NOW)).not.toBeNull()
+test('G: a reading from before its reset is stale, never projected', () => {
+  expect(computeBurn(50, NOW - 10_000, SESSION, NOW)).toBeNull()
+  expect(readQuota({ kind: 'five_hour', percentUsed: 80, resetsAt: new Date(NOW - 10_000).toISOString() }, NOW)).toBe('stale')
+})
+
+test('a reset more than a window ahead (a clock off) is no projection', () => {
+  expect(computeBurn(1, NOW + SESSION + H, SESSION, NOW)).toBeNull()
+  expect(readQuota({ kind: 'five_hour', percentUsed: 1, resetsAt: new Date(NOW + SESSION + H).toISOString() }, NOW)).toBeNull()
+})
+
+test('a window with a known length and reset reads as its burn; others as a plain gauge', () => {
+  const r = readQuota({ kind: 'five_hour', percentUsed: 20, resetsAt: new Date(NOW + 2.5 * H).toISOString() }, NOW)
+  expect(r !== null && r !== 'stale' && Math.round(r.projection)).toBe(40)
+  expect(readQuota({ kind: 'spend_limit', percentUsed: 112 }, NOW)).toBeNull()
 })
 
 test('huge projections are capped in text', () => {

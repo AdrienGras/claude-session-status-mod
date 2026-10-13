@@ -62,9 +62,14 @@ export const compactHeadroom = (tokens: number | undefined, threshold: number | 
 export const toBreakdownView = (b: SessionContextBreakdown): BreakdownView => ({
   categories: b.categories.map(c => ({ name: c.name, tokens: c.tokens, color: c.color, kind: c.kind })),
   memoryFiles: b.memoryFiles.map(f => ({ path: f.path, tokens: f.tokens })),
-  mcpTools: b.mcpTools.map(t => ({ name: t.name, serverName: t.serverName, tokens: t.tokens })),
+  // A deferred tool's schema loads on demand: until searched for, it is outside the window.
+  mcpTools: b.mcpTools.filter(t => t.isLoaded).map(t => ({ name: t.name, serverName: t.serverName, tokens: t.tokens })),
   agents: b.agents.map(a => ({ agentType: a.agentType, tokens: a.tokens })),
-  skills: b.skills && { totalSkills: b.skills.totalSkills, tokens: b.skills.tokens },
+  skills: b.skills && {
+    totalSkills: b.skills.totalSkills,
+    tokens: b.skills.tokens,
+    items: b.skills.skillFrontmatter.map(k => ({ name: k.name, tokens: k.tokens })),
+  },
   autoCompactThreshold: b.autoCompactThreshold,
   isAutoCompactEnabled: b.isAutoCompactEnabled,
   autocompactSource: b.autocompactSource,

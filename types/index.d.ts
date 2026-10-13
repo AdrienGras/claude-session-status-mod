@@ -6,9 +6,9 @@ export type GitSnapshot = {
   cwd: string
   repo: string | null
   branch: string | null
-  files: number
-  added: number
-  removed: number
+  files: number | null
+  added: number | null
+  removed: number | null
   ahead: number | null
   behind: number | null
   sessionFiles: string[]
@@ -16,7 +16,10 @@ export type GitSnapshot = {
 
 export type CardLine = 'model' | 'context' | 'five_hour' | 'seven_day' | 'cost' | 'repo'
 
-export type Settings = { cardLines: CardLine[]; barWidth: number }
+/** `inline`: beside Claude Code's hint, one row; `below`: a row of its own under it, the hint kept as the engine draws it. */
+export type HintLayout = 'inline' | 'below'
+
+export type Settings = { cardLines: CardLine[]; barWidth: number; hintLayout: HintLayout }
 
 export type Speed = { ttftMs: number; tokPerS: number | null }
 
@@ -53,7 +56,7 @@ export type BreakdownView = {
   memoryFiles: { path: string; tokens: number }[]
   mcpTools: { name: string; serverName: string; tokens: number }[]
   agents: { agentType: string; tokens: number }[]
-  skills?: { totalSkills: number; tokens: number }
+  skills?: { totalSkills: number; tokens: number; items: { name: string; tokens: number }[] }
   autoCompactThreshold?: number
   isAutoCompactEnabled: boolean
   autocompactSource: string
@@ -71,6 +74,9 @@ export type UsageView = {
   breakdownDetail: 'summary' | 'full'
 }
 
+/** Inside `declare module 'claude-code'` a bare `Settings` names the engine's own; this one is the mod's. */
+export type ModSettings = Settings
+
 declare module 'claude-code' {
   interface PluginState {
     'session-status': {
@@ -79,7 +85,7 @@ declare module 'claude-code' {
       counters: Counters
       receipt: Receipt | null
       git: GitSnapshot | null
-      settings: Settings
+      settings: ModSettings
       expanded: string[]
     }
   }

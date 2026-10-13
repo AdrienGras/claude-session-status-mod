@@ -1,7 +1,8 @@
 // The side pane, laid out: one framed box per section, every row exactly the pane's width.
 // pane.tsx only draws these rows and wires the buttons.
 import { burnBar, lineBar, segmentBar } from './bars'
-import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
+import { burnVerdict, contextTone, projectionText, projectionTone, readQuota } from './burn'
+import { cellWidth, takeCells, takeLastCells } from './cells'
 import { compactHeadroom, contextFigure, contextLabel, mcpByServer, toSegments } from './context'
 import { fmtDur, fmtTokens, fmtUsd, fmtWhen } from './format'
 import { cellsToParts, effortGauge, prettyModel } from './parts'
@@ -43,24 +44,25 @@ const FRAME = 4
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 const dim = (text: string): Part => ({ text, dim: true })
 const border = (text: string): Part => ({ text, color: 'subtle' })
-const len = (parts: readonly Part[]) => parts.reduce((a, p) => a + [...p.text].length, 0)
+/** Cells, not code points: `⛔` or a CJK name takes two. */
+const len = (parts: readonly Part[]) => parts.reduce((a, p) => a + cellWidth(p.text), 0)
 
 /** Seconds under a minute, else the compact duration. */
 const fmtSpan = (ms: number) => (ms < 60_000 ? `${Math.max(0, Math.round(ms / 1000))}s` : fmtDur(ms))
 
-/** A line cut at `columns`, its last visible character an ellipsis. */
+/** A line cut within `columns` cells, its last visible character an ellipsis. */
 export const fitLine = (line: readonly Part[], columns: number): Part[] => {
   if (len(line) <= columns) return [...line]
   const out: Part[] = []
   let used = 0
   for (const p of line) {
-    const chars = [...p.text]
-    if (used + chars.length < columns) {
+    const w = cellWidth(p.text)
+    if (used + w < columns) {
       out.push(p)
-      used += chars.length
+      used += w
       continue
     }
-    out.push({ ...p, text: `${chars.slice(0, Math.max(0, columns - used - 1)).join('')}…` })
+    out.push({ ...p, text: `${takeCells(p.text, Math.max(0, columns - used - 1))}…` })
     break
   }
   return out
@@ -81,18 +83,17 @@ const spread = ({ left, right = [] }: Row, width: number): Part[] => {
 }
 
 /** A path cut from its start, so the end that names the file stays. */
-const tail = (path: string, max: number) => {
-  const chars = [...path]
-  return chars.length <= max ? path : `…${chars.slice(chars.length - max + 1).join('')}`
-}
+const tail = (path: string, max: number) => (cellWidth(path) <= max ? path : `…${takeLastCells(path, max - 1)}`)
 
-/** `╭─ Title ───────── aside ─╮`, exactly `columns` wide. */
+/** `╭─ Title ───────── aside ─╮`, exactly `columns` wide; the aside (a branch name) gives way to the title. */
 const frameTop = (title: Part[], aside: Part[], columns: number): Part[] => {
   // `╭─ ` + title + ` ` + fill + (` ` + aside + ` `) + `─╮`
-  const asideWidth = aside.length ? len(aside) + 2 : 0
+  const room = columns - 8 - len(title) - 2
+  const shown = aside.length && room >= 4 ? fitLine(aside, room) : []
+  const asideWidth = shown.length ? len(shown) + 2 : 0
   const head = fitLine(title, Math.max(1, columns - 8 - asideWidth))
   const fill = Math.max(1, columns - 6 - len(head) - asideWidth)
-  const end = aside.length ? [{ text: ' ' }, ...aside, border(' ─╮')] : [border('─╮')]
+  const end = shown.length ? [{ text: ' ' }, ...shown, border(' ─╮')] : [border('─╮')]
   const row = [border('╭─ '), ...head, border(` ${'─'.repeat(fill)}`), ...end]
   return len(row) === columns ? row : pad(row, columns)
 }
@@ -129,9 +130,9 @@ const header = ({ usage, live }: PaneInput): Section => {
   const state: Part = live.isWorking ? { text: `● ${S.working}`, color: 'claude' } : dim(`○ ${S.idle}`)
   const facts = [live.permissionMode ? `${S.mode} ${live.permissionMode}` : null, `${live.requests} ${S.req}`].filter(Boolean).join(' · ')
   rows.push({ left: live.effort ? effortGauge(live.effort) : [], right: [dim(facts)] })
-  const speed = live.speed
-    ? `ttft ${(live.speed.ttftMs / 1000).toFixed(1)}s${live.speed.tokPerS === null ? '' : ` · ${Math.round(live.speed.tokPerS)} tok/s`}`
-    : ''
+  const speedParts = live.speed ? [`${S.ttft} ${(live.speed.ttftMs / 1000).toFixed(1)}s`] : []
+  if (typeof live.speed?.tokPerS === 'number') speedParts.push(`${Math.round(live.speed.tokPerS)} ${S.tokPerS}`)
+  const speed = speedParts.join(' · ')
   if (speed || usage) rows.push({ left: [dim(speed)], right: usage ? [dim(`${S.window} ${fmtTokens(usage.window)}`)] : [] })
   const title: Part = { text: live.model ? prettyModel(live.model) : S.model, color: 'claude', bold: true }
   return { title: [title], aside: [state], rows, groups: [] }
@@ -165,11 +166,19 @@ const context = (usage: UsageView, columns: number): Section => {
     }
     const sum = (xs: { tokens: number }[]) => fmtTokens(xs.reduce((a, x) => a + x.tokens, 0))
     const servers = mcpByServer(b.mcpTools)
+    const skills = [...(b.skills?.items ?? [])].sort((x, y) => y.tokens - x.tokens)
     const item = (name: string, tokens: number): Row => ({ left: [{ text: `  ${name}` }], right: [dim(fmtTokens(tokens))] })
     groups.push(
       { key: 'memory', summary: `${S.memory} ${b.memoryFiles.length} · ${sum(b.memoryFiles)}`, items: b.memoryFiles.map(f => item(tail(f.path, inner - 10), f.tokens)) },
-      { key: 'mcp', summary: `MCP ${servers.length} · ${sum(b.mcpTools)}`, items: servers.map(s => item(`${s.server} (${s.count})`, s.tokens)) },
-      { key: 'skills', summary: `${S.skills} ${b.skills?.totalSkills ?? 0} · ${fmtTokens(b.skills?.tokens ?? 0)}`, items: [] },
+      { key: 'mcp', summary: `${S.mcp} ${servers.length} · ${sum(b.mcpTools)}`, items: servers.map(s => item(`${s.server} (${s.count})`, s.tokens)) },
+      {
+        key: 'skills',
+        summary: `${S.skills} ${b.skills?.totalSkills ?? 0} · ${fmtTokens(b.skills?.tokens ?? 0)}`,
+        items: [
+          ...skills.slice(0, MAX_FILES).map(k => item(k.name, k.tokens)),
+          ...(skills.length > MAX_FILES ? [{ left: [dim(`  +${skills.length - MAX_FILES} ${S.more}`)] }] : []),
+        ],
+      },
       { key: 'agents', summary: `${S.agents} ${b.agents.length}`, items: b.agents.map(a => item(a.agentType, a.tokens)) },
     )
   }
@@ -184,10 +193,10 @@ const context = (usage: UsageView, columns: number): Section => {
 
 const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
   const when = (at: number) => `${S.resets} ${fmtWhen(at, now)}`
-  const label = dim(`${r.kind === 'five_hour' ? '5h' : r.kind === 'seven_day' ? '7d' : r.kind} `)
-  const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
+  const label = dim(`${S.windowLabel[r.kind] ?? r.kind} `)
   const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
-  const burn = duration && Number.isFinite(resetsAt) ? computeBurn(r.percentUsed, resetsAt, duration, now) : null
+  const burn = readQuota(r, now)
+  if (burn === 'stale') return [{ left: [label, dim('—')] }, { left: [dim(`   ${S.quotaReset}`)] }]
   if (!burn) {
     const tone = contextTone(r.percentUsed)
     const rows: Row[] = [
@@ -249,19 +258,17 @@ const repo = ({ git, columns }: PaneInput): Section | null => {
   if (!git) return null
   const inner = columns - FRAME
   const rows: Row[] = [{ left: [dim(tail(git.cwd, inner))] }]
-  if (git.repo || git.branch) {
-    const diff: Part[] = git.branch
-      ? [
-          { text: `+${git.added}`, color: 'diffAdded' },
-          { text: ` −${git.removed}`, color: 'diffRemoved' },
-          dim(` · ${plural(git.files, S.file)}${git.ahead !== null && git.behind !== null ? ` · ↑${git.ahead} ↓${git.behind}` : ''}`),
-        ]
+  // Each figure only when git gave it; a detached HEAD still has its diff.
+  const counts: Part[] =
+    git.files !== null && git.added !== null && git.removed !== null
+      ? [{ text: `+${git.added}`, color: 'diffAdded' }, { text: ` −${git.removed}`, color: 'diffRemoved' }, dim(` · ${plural(git.files, S.file)}`)]
       : []
-    const name: Part[] = git.repo ? [{ text: git.repo }] : []
-    // A long name would cut the diff: then each gets a row.
-    if (name.length && diff.length && len(name) + len(diff) + 1 > inner) rows.push({ left: name }, { left: [], right: diff })
-    else rows.push({ left: name, right: diff })
-  }
+  const upstream = git.ahead !== null && git.behind !== null ? [dim(`${counts.length ? ' · ' : ''}↑${git.ahead} ↓${git.behind}`)] : []
+  const diff: Part[] = [...counts, ...upstream]
+  const name: Part[] = git.repo ? [{ text: git.repo }] : []
+  // A long name would cut the diff: then each gets a row.
+  if (name.length && diff.length && len(name) + len(diff) + 1 > inner) rows.push({ left: name }, { left: [], right: diff })
+  else if (name.length || diff.length) rows.push({ left: name, right: diff })
   if (git.sessionFiles.length > 0) {
     rows.push({ left: [dim(`${S.thisSession}:`)] })
     for (const f of git.sessionFiles.slice(0, MAX_FILES)) rows.push({ left: [{ text: `  ${tail(f, inner - 2)}` }] })
