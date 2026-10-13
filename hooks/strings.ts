@@ -25,6 +25,7 @@ export const S = {
   skill: 'skill',
   agent: 'agent',
   resets: 'resets',
+  quotaReset: 'reset; figures with the next reply',
   prompt: 'prompt',
   sinceOpen: 'since open',
   compaction: 'compaction',

@@ -90,3 +90,10 @@ test('branch & diff, the diff left out when unknown', () => {
   expect(bar({ settings, git })).toBe(' main +3 −1')
   expect(bar({ settings, git: { ...git, files: null, added: null, removed: null } })).toBe(' main')
 })
+
+test('a window read before its reset shows no figure', () => {
+  const stale = { ...usage, rateLimits: [{ kind: 'five_hour', percentUsed: 80, resetsAt: iso(NOW - 60_000) }] }
+  const t = bar({ usage: stale })
+  expect(t).not.toContain('80%')
+  expect(t.endsWith('5h —')).toBe(true)
+})

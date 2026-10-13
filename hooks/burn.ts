@@ -3,6 +3,7 @@ import type { ThemeKey } from 'claude-code'
 
 import { fmtDur } from './format'
 import { S } from './strings'
+import type { RateLimit } from '../types'
 
 export const WINDOW_MS = {
   five_hour: 5 * 3_600_000,
@@ -22,9 +23,13 @@ export type Burn = {
   isLowConfidence: boolean
 }
 
-/** The window is of fixed length, so it began at `resetsAtMs - durationMs`. */
+/**
+ * The window is of fixed length, so it began at `resetsAtMs - durationMs`. Null outside it: past the
+ * reset the reading is the last window's; a reset over a window ahead means a clock is off.
+ */
 export const computeBurn = (usedPct: number, resetsAtMs: number, durationMs: number, nowMs: number): Burn | null => {
   if (durationMs <= 0 || !Number.isFinite(resetsAtMs)) return null
+  if (nowMs >= resetsAtMs || resetsAtMs - nowMs > durationMs) return null
   const used = Math.max(0, usedPct)
   const elapsed = nowMs - (resetsAtMs - durationMs)
   const elapsedFrac = Math.min(1, Math.max(1e-6, elapsed / durationMs))
@@ -38,6 +43,17 @@ export const computeBurn = (usedPct: number, resetsAtMs: number, durationMs: num
   }
   const marginMs = juiceMs === Infinity ? Infinity : juiceMs - remainingMs
   return { usedPct: used, elapsedFrac, remainingMs, projection, juiceMs, marginMs, isLowConfidence: elapsedFrac < CONFIDENCE_FLOOR }
+}
+
+/**
+ * A window as the last response reported it: its burn; `stale` once its reset has passed (the figure
+ * is the old window's until a reply brings the new one); null for a plain gauge (no length or reset).
+ */
+export const readQuota = (r: RateLimit, nowMs: number): Burn | 'stale' | null => {
+  const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
+  if (Number.isFinite(resetsAt) && nowMs >= resetsAt) return 'stale'
+  const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
+  return duration ? computeBurn(r.percentUsed, resetsAt, duration, nowMs) : null
 }
 
 /** `⛔ limit`, `✓ ∞`, `✓ +7h30`, `⚠ wall 1h04`. */

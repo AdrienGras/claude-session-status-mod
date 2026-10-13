@@ -1,6 +1,6 @@
 // The status line under the prompt: the person's items, one line, cut to the room it has.
 import { lineBar, segmentBar, burnBar } from './bars'
-import { computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
+import { contextTone, projectionText, projectionTone, readQuota } from './burn'
 import { contextFigure, contextLabel, toSegments } from './context'
 import { fmtUsd } from './format'
 import { cellsToParts, prettyModel } from './parts'
@@ -39,9 +39,8 @@ const context = (usage: UsageView, w: number): Part[] => {
 const quota = (r: RateLimit, w: number, now: number): Part[] => {
   const label: Part = { text: `${WINDOW_LABEL[r.kind] ?? r.kind} `, dim: true }
   const used = `${Math.round(r.percentUsed)}%`
-  const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
-  const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
-  const burn = duration && Number.isFinite(resetsAt) ? computeBurn(r.percentUsed, resetsAt, duration, now) : null
+  const burn = readQuota(r, now)
+  if (burn === 'stale') return [label, { text: '—', dim: true }]
   if (!burn) {
     const tone = contextTone(r.percentUsed)
     return [label, ...cellsToParts(lineBar(r.percentUsed / 100, w, tone)), { text: ` ${used}`, color: tone }]

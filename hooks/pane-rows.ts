@@ -1,7 +1,7 @@
 // The side pane, laid out: one framed box per section, every row exactly the pane's width.
 // pane.tsx only draws these rows and wires the buttons.
 import { burnBar, lineBar, segmentBar } from './bars'
-import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
+import { burnVerdict, contextTone, projectionText, projectionTone, readQuota } from './burn'
 import { compactHeadroom, contextFigure, contextLabel, mcpByServer, toSegments } from './context'
 import { fmtDur, fmtTokens, fmtUsd, fmtWhen } from './format'
 import { cellsToParts, effortGauge, prettyModel } from './parts'
@@ -185,9 +185,9 @@ const context = (usage: UsageView, columns: number): Section => {
 const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
   const when = (at: number) => `${S.resets} ${fmtWhen(at, now)}`
   const label = dim(`${r.kind === 'five_hour' ? '5h' : r.kind === 'seven_day' ? '7d' : r.kind} `)
-  const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
   const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
-  const burn = duration && Number.isFinite(resetsAt) ? computeBurn(r.percentUsed, resetsAt, duration, now) : null
+  const burn = readQuota(r, now)
+  if (burn === 'stale') return [{ left: [label, dim('—')] }, { left: [dim(`   ${S.quotaReset}`)] }]
   if (!burn) {
     const tone = contextTone(r.percentUsed)
     const rows: Row[] = [

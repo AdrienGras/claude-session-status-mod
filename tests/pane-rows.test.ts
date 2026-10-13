@@ -121,6 +121,15 @@ test('quotas: used, projection and verdict, then the reset; no box without windo
   expect(box(input({ usage: { ...input().usage!, rateLimits: [] } }), 'Quotas')).toBe(undefined)
 })
 
+test('a window read before its reset shows no figure until the next reply', () => {
+  const stale = { kind: 'five_hour', percentUsed: 80, resetsAt: iso(NOW - 60_000) }
+  const t = box(input({ usage: { ...input().usage!, rateLimits: [stale] } }), 'Quotas')!
+  expect(t).not.toContain('80%')
+  expect(t).not.toContain('→')
+  expect(t).toContain('5h —')
+  expect(t).toContain('reset; figures with the next reply')
+})
+
 test('a spend limit past 100% is a plain gauge with its real value', () => {
   const t = box(input({ usage: { ...input().usage!, rateLimits: [{ kind: 'spend_limit', percentUsed: 112 }] } }), 'Quotas')!
   expect(t).toContain('112%')
