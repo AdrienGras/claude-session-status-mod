@@ -3,6 +3,7 @@ import { atom, read } from 'claude-code'
 
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import type { GitSnapshot, Receipt } from '../types'
+import { registerCard } from './card'
 import { registerTracking } from './track'
 
 const liveAtom = atom({ plugin: 'session-status', key: 'live' } as const, EMPTY_LIVE)
@@ -13,6 +14,7 @@ const settingsAtom = atom({ plugin: 'session-status', key: 'settings' } as const
 
 export const register: Register = on => {
   registerTracking(on)
+  registerCard(on)
 
   on('command.run', { command: 'sst' }, async ($, e) => {
     const args = e.args.trim()

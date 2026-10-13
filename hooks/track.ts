@@ -70,6 +70,8 @@ export const registerTracking = (on: On): void => {
   on('session.start', async ($, e, next) => {
     const r = await next(e)
     await $.command.register({ name: 'sst', description: STR.commandDescription })
+    const model = await $.session.model()
+    await update($, liveAtom, l => ({ ...l, model: l.model ?? model }))
     const stored = await $.store.get(SETTINGS_KEY)
     await update($, settingsAtom, () => normalizeSettings(stored))
     const view = await refreshUsage($)
