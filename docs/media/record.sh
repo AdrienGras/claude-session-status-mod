@@ -4,6 +4,7 @@
 #
 #   docs/media/record.sh            record, then convert
 #   docs/media/record.sh --convert  convert the last recording again (other font size, trim…)
+#   SELECT=event:11..event:122 docs/media/record.sh --convert   keep only that part (agg --select)
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -14,10 +15,11 @@ DEMO_DIR=${DEMO_DIR:-/tmp/session-status-demo}
 FONT=${FONT:-"FiraCode Nerd Font Mono"}
 FONT_SIZE=${FONT_SIZE:-16}
 THEME=${THEME:-github-dark}
+SELECT=${SELECT:-}
 
 convert() {
   agg --font-family "$FONT" --font-size "$FONT_SIZE" --theme "$THEME" \
-    --idle-time-limit 2 --last-frame-duration 4 "$CAST" "$GIF"
+    --idle-time-limit 2 --last-frame-duration 4 ${SELECT:+--select "$SELECT"} "$CAST" "$GIF"
   echo "→ $GIF ($(du -h "$GIF" | cut -f1))"
 }
 
@@ -53,4 +55,4 @@ cd "$DEMO_DIR"
 asciinema rec --overwrite --idle-time-limit 2 -c "claude" "$CAST"
 convert
 echo "Check the first frames: if Claude Code's welcome shows your account, trim it with"
-echo "  agg … --select 3..100%   (see agg --help), then tell Claude the GIF is ready."
+echo "  SELECT=event:<first>..event:<last> $0 --convert   (see agg --help: --select)"
