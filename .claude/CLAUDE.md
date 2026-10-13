@@ -25,7 +25,7 @@ TDD: write the test, watch it fail for the right reason, then the code.
 | `hooks/minibar.tsx` / `minibar-rows.ts` | status line under the prompt: drawing / pure line builder |
 | `hooks/pane.tsx` / `pane-rows.ts` | side pane: drawing + buttons / pure framed rows, every row exactly `bodyColumns` wide |
 | `hooks/settings-view.tsx` | settings pane (`sst-config`, a separate pane) |
-| `hooks/parts.ts`, `bars.ts`, `burn.ts`, `context.ts`, `format.ts`, `git.ts`, `session.ts`, `settings.ts`, `debug.ts` | pure logic, unit-tested |
+| `hooks/parts.ts`, `agents.ts`, `bars.ts`, `cells.ts`, `burn.ts`, `context.ts`, `format.ts`, `git.ts`, `session.ts`, `settings.ts`, `debug.ts` | pure logic, unit-tested |
 | `hooks/strings.ts` | every displayed string (future i18n) |
 | `hooks/state.ts` | initial values of the atoms only |
 | `types/index.d.ts` | the `$.state` contract |

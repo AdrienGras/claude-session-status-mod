@@ -4,6 +4,10 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+
+- The Agents box in the side pane: a card per subagent, tracked live from spawn to end.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added

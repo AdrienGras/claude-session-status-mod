@@ -2,7 +2,7 @@ import type { Register } from 'claude-code'
 import { atom, read } from 'claude-code'
 
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
-import type { GitSnapshot, Receipt } from '../types'
+import type { AgentCard, GitSnapshot, Receipt } from '../types'
 import { registerMinibar } from './minibar'
 import { PANE_ID, registerPane } from './pane'
 import { CONFIG_PANE_ID, registerSettingsView } from './settings-view'
@@ -15,6 +15,7 @@ const liveAtom = atom({ plugin: 'session-status', key: 'live' } as const, EMPTY_
 const countersAtom = atom({ plugin: 'session-status', key: 'counters' } as const, emptyCounters(0))
 const receiptAtom = atom({ plugin: 'session-status', key: 'receipt' } as const, null as Receipt | null)
 const gitAtom = atom({ plugin: 'session-status', key: 'git' } as const, null as GitSnapshot | null)
+const agentsAtom = atom({ plugin: 'session-status', key: 'agents' } as const, [] as AgentCard[])
 const settingsAtom = atom({ plugin: 'session-status', key: 'settings' } as const, INITIAL_SETTINGS)
 
 export const register: Register = on => {
@@ -33,6 +34,7 @@ export const register: Register = on => {
         receipt: await read($, receiptAtom),
         git: await read($, gitAtom),
         settings: normalizeSettings(await read($, settingsAtom)),
+        agents: await read($, agentsAtom),
       })
       return { text: JSON.stringify(dump, null, 2) }
     }
