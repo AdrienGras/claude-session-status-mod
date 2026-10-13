@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { fmtClock, fmtDur, fmtTokens, fmtUsd } from '../hooks/format'
+import { fmtClock, fmtDur, fmtElapsed, fmtTokensFine, fmtTokens, fmtUsd } from '../hooks/format'
 
 const H = 3_600_000
 
@@ -46,4 +46,14 @@ test('a reset reads as a clock time today, tomorrow, or a date beyond', () => {
   expect(fmtWhen(new Date(2026, 9, 13, 23, 50).getTime(), now)).toBe('23:50')
   expect(fmtWhen(new Date(2026, 9, 14, 17, 0).getTime(), now)).toBe('tomorrow 17:00')
   expect(fmtWhen(new Date(2026, 9, 15, 17, 0).getTime(), now)).toBe('Oct 15 17:00')
+})
+
+test('card figures keep the seconds and the first decimal', () => {
+  expect(fmtElapsed(48_000)).toBe('48s')
+  expect(fmtElapsed(72_000)).toBe('1m12s')
+  expect(fmtElapsed(125_000)).toBe('2m05s')
+  expect(fmtElapsed(4 * H + 36 * 60_000)).toBe('4h36')
+  expect(fmtTokensFine(3_100)).toBe('3.1k')
+  expect(fmtTokensFine(24_000)).toBe('24k')
+  expect(fmtTokensFine(900)).toBe('900')
 })

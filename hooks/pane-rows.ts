@@ -4,14 +4,15 @@ import { burnBar, lineBar, segmentBar } from './bars'
 import { burnVerdict, contextTone, projectionText, projectionTone, readQuota } from './burn'
 import { cellWidth, takeCells, takeLastCells } from './cells'
 import { compactHeadroom, contextFigure, contextLabel, mcpByServer, toSegments } from './context'
-import { fmtDur, fmtTokens, fmtUsd, fmtWhen } from './format'
+import { keepCards } from './agents'
+import { fmtDur, fmtElapsed, fmtTokens, fmtTokensFine, fmtUsd, fmtWhen } from './format'
 import { cellsToParts, effortGauge, prettyModel } from './parts'
 import type { Part } from './parts'
 import { costRates } from './session'
 import { S } from './strings'
-import type { Counters, GitSnapshot, Live, RateLimit, Receipt, Settings, UsageView } from '../types'
+import type { AgentCard, Counters, GitSnapshot, Live, RateLimit, Receipt, Settings, UsageView } from '../types'
 
-export type GroupKey = 'memory' | 'mcp' | 'skills' | 'agents'
+export type GroupKey = 'memory' | 'mcp' | 'skills' | 'agents' | `agent:${string}`
 
 /** A drawn row: text, or a row of unfoldable lists, each a button of its own. */
 export type PaneRow =
@@ -26,13 +27,15 @@ export type PaneInput = {
   git: GitSnapshot | null
   settings: Settings
   expanded: readonly string[]
+  agents: readonly AgentCard[]
   now: number
   columns: number
 }
 
 /** A row's content: a left side, and a right side pushed to the box's right edge. */
 type Row = { left: Part[]; right?: Part[] }
-type Group = { key: GroupKey; summary: string; items: Row[] }
+/** A wide group has a row of its own, `right` pushed to the edge, `under` always shown below it. */
+type Group = { key: GroupKey; summary: string; items: Row[]; isWide?: boolean; right?: Part[]; under?: Row[] }
 type Section = { title: Part[]; aside: Part[]; rows: Row[]; groups: Group[] }
 
 const LEGEND_SIZE = 4
@@ -105,13 +108,17 @@ const frameRow = (row: Row, columns: number): PaneRow => ({
 
 const frameBottom = (columns: number): PaneRow => ({ kind: 'text', parts: [border(`╰${'─'.repeat(columns - 2)}╯`)] })
 
-/** The lists two to a row, each its own button, then the open ones' items under them. */
+/** The lists two to a row, each its own button, then the open ones' items under them; a wide one is alone, full width. */
 const frameGroups = (groups: Group[], expanded: readonly string[], columns: number): PaneRow[] => {
   const inner = columns - FRAME
   const half = Math.floor((inner - 1) / 2)
   const out: PaneRow[] = []
-  for (let i = 0; i < groups.length; i += 2) {
-    const pair = groups.slice(i, i + 2)
+  const items = (g: Group) => {
+    for (const under of g.under ?? []) out.push(frameRow(under, columns))
+    if (expanded.includes(g.key)) for (const item of g.items) out.push(frameRow(item, columns))
+  }
+  const flush = (pair: Group[]) => {
+    if (pair.length === 0) return
     const cells = pair.map((g, k) => {
       const isOpen = expanded.includes(g.key)
       const width = k === 0 ? half : inner - half - 1
@@ -120,8 +127,31 @@ const frameGroups = (groups: Group[], expanded: readonly string[], columns: numb
     if (cells.length === 2) cells[0]!.parts.push({ text: ' ' })
     const used = cells.reduce((a, c) => a + len(c.parts), 0)
     out.push({ kind: 'groups', lead: [border('│ ')], groups: cells, tail: [{ text: ' '.repeat(Math.max(0, inner - used)) }, border(' │')] })
-    for (const g of pair) if (expanded.includes(g.key)) for (const item of g.items) out.push(frameRow(item, columns))
+    for (const g of pair) items(g)
   }
+  let pair: Group[] = []
+  for (const g of groups) {
+    if (g.isWide) {
+      flush(pair)
+      pair = []
+      const right = g.right ?? []
+      const left = fitLine([{ text: `${expanded.includes(g.key) ? '▾' : '▸'} ${g.summary}` }], Math.max(1, inner - len(right) - 1))
+      out.push({
+        kind: 'groups',
+        lead: [border('│ ')],
+        groups: [{ key: g.key, parts: spread({ left, right }, inner) }],
+        tail: [border(' │')],
+      })
+      items(g)
+      continue
+    }
+    pair.push(g)
+    if (pair.length === 2) {
+      flush(pair)
+      pair = []
+    }
+  }
+  flush(pair)
   return out
 }
 
@@ -254,6 +284,49 @@ const session = ({ usage, counters, receipt, now }: PaneInput): Section => {
   return { title: [{ text: S.session, color: 'claude', bold: true }], aside: cost === undefined ? [] : [{ text: fmtUsd(cost), color: 'warning' }], rows, groups: [] }
 }
 
+const STATE_GLYPH = {
+  running: { glyph: '●', color: 'claude' },
+  done: { glyph: '✓', color: 'success' },
+  failed: { glyph: '✗', color: 'error' },
+  stopped: { glyph: '■', color: 'inactive' },
+} as const
+
+/** One wide group per subagent: its state and timer on the button row, its figures under it. */
+const agents = ({ agents: cards, now, columns }: PaneInput): Section | null => {
+  if (cards.length === 0) return null
+  const inner = columns - FRAME
+  const shown = keepCards(cards)
+  const running = shown.filter(c => c.state === 'running').length
+  const groups: Group[] = shown.map(c => {
+    const { glyph, color } = STATE_GLYPH[c.state]
+    const span = fmtElapsed((c.endedAt ?? now) - c.startedAt)
+    const figures = [
+      c.contextTokens === null ? null : `${S.ctx} ${fmtTokensFine(c.contextTokens)}`,
+      `${fmtTokensFine(c.outputTokens)} ${S.out}`,
+      plural(c.steps, S.step),
+    ].filter(Boolean)
+    return {
+      key: `agent:${c.id}`,
+      summary: `${c.type} · ${c.task}`,
+      isWide: true,
+      right: [{ text: `${glyph} ${span}`, color }],
+      under: [{ left: [dim(`  ${figures.join(' · ')}`)] }],
+      items:
+        c.calls.length === 0
+          ? [{ left: [dim(`  ${S.noCalls}`)] }]
+          : c.calls.map(call => ({
+              left: [{ text: `  ${call.tool}` }, ...(call.detail === null ? [] : [dim(`  ${tail(call.detail, Math.max(1, inner - 4 - cellWidth(call.tool)))}`)])],
+            })),
+    }
+  })
+  return {
+    title: [{ text: S.agentsTitle, color: 'claude', bold: true }],
+    aside: running > 0 ? [dim(`${running} ${S.running}`)] : [],
+    rows: [],
+    groups,
+  }
+}
+
 const repo = ({ git, columns }: PaneInput): Section | null => {
   if (!git) return null
   const inner = columns - FRAME
@@ -289,6 +362,7 @@ export const paneRows = (input: PaneInput): PaneRow[] => {
     input.usage && context(input.usage, input.columns),
     input.usage && quotas(input.usage, input),
     session(input),
+    agents(input),
     repo(input),
   ].filter((s): s is Section => s !== null)
   return sections.flatMap(s => [

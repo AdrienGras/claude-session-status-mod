@@ -33,6 +33,7 @@ export const registerPane = (on: On): void => {
       git: await read($, gitAtom),
       settings: normalizeSettings(await read($, settingsAtom)),
       expanded: await read($, expandedAtom),
+      agents: [],
       now: await $.clock.now(),
       columns,
     })

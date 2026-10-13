@@ -22,6 +22,18 @@ export const fmtTokens = (n: number): string => {
   return `${Math.round(n / 100_000) / 10}M`
 }
 
+/** `48s`, `1m12s`, `12m05s`; an hour and more read as `fmtDur`. */
+export const fmtElapsed = (ms: number): string => {
+  const s = Math.round(Math.max(0, ms) / 1000)
+  if (s < 60) return `${s}s`
+  if (s < 3_600) return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, '0')}s`
+  return fmtDur(ms)
+}
+
+/** `300`, `3.1k` below ten thousand, else as `fmtTokens`. */
+export const fmtTokensFine = (n: number): string =>
+  n >= 1_000 && n < 9_950 ? `${(Math.round(n / 100) / 10).toFixed(1)}k` : fmtTokens(n)
+
 /** `$4.82` below a hundred, `$104` above. */
 export const fmtUsd = (usd: number): string => (usd >= 100 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`)
 
