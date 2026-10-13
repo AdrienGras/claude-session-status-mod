@@ -2,6 +2,8 @@
 
 A Claude Code mod that replaces your status line with a native one, under the prompt, and a side pane. It shows the model, effort, context by category, rate-limit windows with a burn-rate projection, session cost and your repo. Everything is read from the session itself: no script polling every few seconds, no separate binary.
 
+<p align="center"><img src="docs/media/demo.gif" alt="Claude Code with session-status: the status line under the prompt fills in as a turn runs, then /sst opens the side pane beside the transcript" width="900"></p>
+
 Tested on Claude Code **2.1.296**. Mods are an early-access Claude Code feature and their API may change between releases.
 
 ## Install
@@ -18,11 +20,9 @@ Answer `y` to add the marketplace, then pick a scope (user scope loads it in eve
 
 ### The status line
 
-One line under the prompt, where Claude Code draws its hint (`? for shortcuts`), which stays at the left. By default:
+One line under the prompt, where Claude Code draws its hint, which stays at the left. By default:
 
-```
-? for shortcuts  │ Opus 5.5 ▮▮▮▯▯ │ ctx ━───────── 4% │ 5h ╸┊──────── 7% → 49% ✓ │ $0.17 ◨
-```
+![The status line under the prompt: model and effort, context, the 5h window with its projection](docs/media/statusline.png)
 
 - **Model and effort**: the effort as five notches
 - **Context**: a bar coloured by category, the same colours `/context` uses, and the share of the window. Before the first reply it shows Claude Code's own estimate, marked `≈`
@@ -34,6 +34,8 @@ Items that do not fit the terminal are dropped from the right. `◨` opens the s
 ### The side pane
 
 `/sst` toggles it. In fullscreen at 110 columns or more it docks beside the transcript; otherwise it sits above the prompt.
+
+<img src="docs/media/pane.png" alt="The side pane: model, context by category, quotas with burn-rate projection, session cost, repo" width="420">
 
 | Section | Shows |
 | --- | --- |
