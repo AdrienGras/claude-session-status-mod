@@ -9,7 +9,7 @@ test('the docked pane shows its sections', async ($, on) => {
   await startSession($)
   await fake.clock.settle() // git is read after session.start hands back
   const ui = await $.ui.mount(paneTarget())
-  for (const title of ['Model', 'Context', 'Quotas', 'Session', 'Repo']) expect(await ui.find({ text: new RegExp(`^${title}`) })).toBeDefined()
+  for (const title of ['Opus 5\\.5', 'Context', 'Quotas', 'Session', 'Repo']) expect(await ui.find({ text: new RegExp(`╭─ ${title}`) })).toBeDefined()
   await ui.unmount()
 })
 
@@ -17,7 +17,7 @@ test('no rate limits: no quotas section', async ($, on) => {
   fakeEngine(on)
   await startSession($)
   const ui = await $.ui.mount(paneTarget())
-  expect(await ui.find({ text: /^Quotas/ })).toBeUndefined()
+  expect(await ui.find({ text: /╭─ Quotas/ })).toBeUndefined()
   await ui.unmount()
 })
 

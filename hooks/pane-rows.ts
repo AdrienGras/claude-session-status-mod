@@ -1,18 +1,21 @@
-// What the side pane says, section by section, as coloured parts; drawing is pane.tsx's.
-import { contextParts, effortGauge, prettyModel, quotaParts } from './parts'
-import type { Part } from './parts'
-import { compactHeadroom, mcpByServer, toSegments } from './context'
+// The side pane, laid out: one framed box per section, every row exactly the pane's width.
+// pane.tsx only draws these rows and wires the buttons.
+import { burnBar, lineBar, segmentBar } from './bars'
+import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
+import { compactHeadroom, contextLabel, mcpByServer, toSegments } from './context'
 import { fmtClock, fmtDur, fmtTokens, fmtUsd } from './format'
+import { cellsToParts, effortGauge, prettyModel } from './parts'
+import type { Part } from './parts'
 import { costRates } from './session'
 import { S } from './strings'
-import type { Counters, GitSnapshot, Live, Receipt, Settings, UsageView } from '../types'
-import { WINDOW_MS } from './burn'
+import type { Counters, GitSnapshot, Live, RateLimit, Receipt, Settings, UsageView } from '../types'
 
-export type Line = Part[]
 export type GroupKey = 'memory' | 'mcp' | 'skills' | 'agents'
-export type Group = { key: GroupKey; summary: Line; items: Line[]; isOpen: boolean }
-export type SectionKey = 'header' | 'context' | 'quotas' | 'session' | 'repo'
-export type Section = { key: SectionKey; title: string; lines: Line[]; groups: Group[] }
+
+/** A drawn row: text, or a row of unfoldable lists, each a button of its own. */
+export type PaneRow =
+  | { kind: 'text'; parts: Part[] }
+  | { kind: 'groups'; lead: Part[]; groups: { key: GroupKey; parts: Part[] }[]; tail: Part[] }
 
 export type PaneInput = {
   usage: UsageView | null
@@ -26,22 +29,30 @@ export type PaneInput = {
   columns: number
 }
 
+/** A row's content: a left side, and a right side pushed to the box's right edge. */
+type Row = { left: Part[]; right?: Part[] }
+type Group = { key: GroupKey; summary: string; items: Row[] }
+type Section = { title: Part[]; aside: Part[]; rows: Row[]; groups: Group[] }
+
+const LEGEND_SIZE = 4
 const MAX_FILES = 10
 const MAX_TOOLS = 5
+/** `│ ` and ` │` around a row's content. */
+const FRAME = 4
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 const dim = (text: string): Part => ({ text, dim: true })
-const sep = dim(' · ')
+const border = (text: string): Part => ({ text, color: 'subtle' })
+const len = (parts: readonly Part[]) => parts.reduce((a, p) => a + [...p.text].length, 0)
 
 /** Seconds under a minute, else the compact duration. */
 const fmtSpan = (ms: number) => (ms < 60_000 ? `${Math.max(0, Math.round(ms / 1000))}s` : fmtDur(ms))
 
 /** A line cut at `columns`, its last visible character an ellipsis. */
-export const fitLine = (line: Line, columns: number): Line => {
-  const out: Line = []
+export const fitLine = (line: readonly Part[], columns: number): Part[] => {
+  if (len(line) <= columns) return [...line]
+  const out: Part[] = []
   let used = 0
-  const total = line.reduce((a, p) => a + [...p.text].length, 0)
-  if (total <= columns) return line
   for (const p of line) {
     const chars = [...p.text]
     if (used + chars.length < columns) {
@@ -55,155 +66,220 @@ export const fitLine = (line: Line, columns: number): Line => {
   return out
 }
 
+/** Exactly `width` columns: cut, or padded with spaces. */
+const pad = (parts: readonly Part[], width: number): Part[] => {
+  const fitted = fitLine(parts, width)
+  const gap = width - len(fitted)
+  return gap > 0 ? [...fitted, { text: ' '.repeat(gap) }] : fitted
+}
+
+/** Left and right sides `width` apart; when they do not both fit, one line cut at the end. */
+const spread = ({ left, right = [] }: Row, width: number): Part[] => {
+  if (right.length === 0) return pad(left, width)
+  const gap = width - len(left) - len(right)
+  return gap >= 1 ? [...left, { text: ' '.repeat(gap) }, ...right] : pad([...left, { text: ' ' }, ...right], width)
+}
+
 /** A path cut from its start, so the end that names the file stays. */
 const tail = (path: string, max: number) => {
   const chars = [...path]
   return chars.length <= max ? path : `…${chars.slice(chars.length - max + 1).join('')}`
 }
 
+/** `╭─ Title ───────── aside ─╮`, exactly `columns` wide. */
+const frameTop = (title: Part[], aside: Part[], columns: number): Part[] => {
+  // `╭─ ` + title + ` ` + fill + (` ` + aside) + ` ─╮`
+  const asideWidth = aside.length ? len(aside) + 1 : 0
+  const head = fitLine(title, Math.max(1, columns - 8 - asideWidth))
+  const fill = Math.max(1, columns - 7 - len(head) - asideWidth)
+  const row = [border('╭─ '), ...head, border(` ${'─'.repeat(fill)}`), ...(aside.length ? [{ text: ' ' }, ...aside] : []), border(' ─╮')]
+  return len(row) === columns ? row : pad(row, columns)
+}
+
+const frameRow = (row: Row, columns: number): PaneRow => ({
+  kind: 'text',
+  parts: [border('│ '), ...spread(row, columns - FRAME), border(' │')],
+})
+
+const frameBottom = (columns: number): PaneRow => ({ kind: 'text', parts: [border(`╰${'─'.repeat(columns - 2)}╯`)] })
+
+/** The lists two to a row, each its own button, then the open ones' items under them. */
+const frameGroups = (groups: Group[], expanded: readonly string[], columns: number): PaneRow[] => {
+  const inner = columns - FRAME
+  const half = Math.floor((inner - 1) / 2)
+  const out: PaneRow[] = []
+  for (let i = 0; i < groups.length; i += 2) {
+    const pair = groups.slice(i, i + 2)
+    const cells = pair.map((g, k) => {
+      const isOpen = expanded.includes(g.key)
+      const width = k === 0 ? half : inner - half - 1
+      return { key: g.key, parts: pad([{ text: `${isOpen ? '▾' : '▸'} ${g.summary}` }], width) }
+    })
+    if (cells.length === 2) cells[0]!.parts.push({ text: ' ' })
+    const used = cells.reduce((a, c) => a + len(c.parts), 0)
+    out.push({ kind: 'groups', lead: [border('│ ')], groups: cells, tail: [{ text: ' '.repeat(Math.max(0, inner - used)) }, border(' │')] })
+    for (const g of pair) if (expanded.includes(g.key)) for (const item of g.items) out.push(frameRow(item, columns))
+  }
+  return out
+}
+
 const header = ({ usage, live }: PaneInput): Section => {
-  const lines: Line[] = []
-  if (live.model) {
-    const model: Part = { text: prettyModel(live.model), color: 'claude', bold: true }
-    lines.push(live.effort ? [model, { text: '  ' }, ...effortGauge(live.effort)] : [model])
-  }
-  const state: Line = []
-  if (live.permissionMode) state.push(dim(`${S.mode} `), { text: live.permissionMode }, { text: '  ' })
-  state.push(live.isWorking ? { text: `● ${S.working}`, color: 'claude' } : dim(`○ ${S.idle}`))
-  state.push({ text: '  ' }, dim(`${live.requests} ${S.req}`))
-  lines.push(state)
-  if (live.speed) {
-    const { ttftMs, tokPerS } = live.speed
-    lines.push([dim(`ttft ${(ttftMs / 1000).toFixed(1)}s${tokPerS === null ? '' : ` · ${Math.round(tokPerS)} tok/s`}`)])
-  }
-  if (usage) {
-    const source = usage.breakdown?.autocompactSource
-    lines.push([dim(`${S.window} ${fmtTokens(usage.window)}${source ? ` (${source})` : ''}`)])
-  }
-  return { key: 'header', title: S.model, lines, groups: [] }
+  const rows: Row[] = []
+  const state: Part = live.isWorking ? { text: `● ${S.working}`, color: 'claude' } : dim(`○ ${S.idle}`)
+  const facts = [live.permissionMode ? `${S.mode} ${live.permissionMode}` : null, `${live.requests} ${S.req}`].filter(Boolean).join(' · ')
+  rows.push({ left: live.effort ? effortGauge(live.effort) : [], right: [dim(facts)] })
+  const speed = live.speed
+    ? `ttft ${(live.speed.ttftMs / 1000).toFixed(1)}s${live.speed.tokPerS === null ? '' : ` · ${Math.round(live.speed.tokPerS)} tok/s`}`
+    : ''
+  if (speed || usage) rows.push({ left: [dim(speed)], right: usage ? [dim(`${S.window} ${fmtTokens(usage.window)}`)] : [] })
+  const title: Part = { text: live.model ? prettyModel(live.model) : S.model, color: 'claude', bold: true }
+  return { title: [title], aside: [state], rows, groups: [] }
 }
 
-const group = (key: GroupKey, expanded: readonly string[], summary: string, items: Line[]): Group => {
-  const isOpen = expanded.includes(key)
-  return { key, summary: [{ text: `${isOpen ? '▾' : '▸'} ${summary}` }], items: isOpen ? items : [], isOpen }
-}
-
-const context = (input: PaneInput, usage: UsageView, width: number): Section => {
+const context = (usage: UsageView, columns: number): Section => {
   const b = usage.breakdown
-  const lines: Line[] = [contextParts(usage, width)]
+  const label = contextLabel(usage.tokens, usage.window)
+  const tone = label.pct === null ? 'inactive' : contextTone(label.pct)
+  const inner = columns - FRAME
+  const rows: Row[] = []
   const groups: Group[] = []
+  if (b && usage.tokens !== undefined) {
+    const segments = toSegments(b, usage.tokens, usage.window)
+    rows.push({ left: cellsToParts(segmentBar(segments, usage.window, inner)) })
+    const used = segments.filter(s => s.kind === 'used' && Math.round(s.tokens) > 0).sort((x, y) => y.tokens - x.tokens)
+    for (const s of used.slice(0, LEGEND_SIZE)) rows.push({ left: [{ text: '■ ', color: s.color }, { text: s.label }], right: [dim(fmtTokens(s.tokens))] })
+    const rest = used.slice(LEGEND_SIZE).reduce((a, s) => a + s.tokens, 0)
+    if (rest > 0) rows.push({ left: [dim(`■ ${S.other}`)], right: [dim(fmtTokens(rest))] })
+  } else {
+    rows.push({ left: cellsToParts(lineBar(label.pct === null ? 0 : label.pct / 100, inner, tone)) })
+  }
   if (b) {
-    for (const s of toSegments(b, usage.tokens, usage.window)) {
-      lines.push(
-        s.kind === 'free'
-          ? [dim(`□ ${s.label} ${fmtTokens(s.tokens)}`)]
-          : [{ text: '■ ', color: s.color }, { text: s.label }, dim(` ${fmtTokens(s.tokens)}`)],
-      )
-    }
-    if (!b.isAutoCompactEnabled) lines.push([dim(S.autoCompactOff)])
+    if (!b.isAutoCompactEnabled) rows.push({ left: [dim(S.autoCompactOff)] })
     else {
       const room = compactHeadroom(usage.tokens, b.autoCompactThreshold)
-      if (room !== null) lines.push([dim(`${S.autoCompactIn} ${fmtTokens(room)}`)])
+      if (room !== null) rows.push({ left: [dim(S.autoCompactIn)], right: [dim(fmtTokens(room))] })
     }
     const sum = (xs: { tokens: number }[]) => fmtTokens(xs.reduce((a, x) => a + x.tokens, 0))
     const servers = mcpByServer(b.mcpTools)
-    const items = (rows: { name: string; tokens: number }[]) => rows.map(r => [{ text: `  ${r.name}` }, dim(` ${fmtTokens(r.tokens)}`)])
+    const item = (name: string, tokens: number): Row => ({ left: [{ text: `  ${name}` }], right: [dim(fmtTokens(tokens))] })
     groups.push(
-      group('memory', input.expanded, `${plural(b.memoryFiles.length, S.memoryFile)} · ${sum(b.memoryFiles)}`,
-        items(b.memoryFiles.map(f => ({ name: tail(f.path, input.columns - 8), tokens: f.tokens })))),
-      group('mcp', input.expanded, `${plural(servers.length, S.mcpServer)} · ${plural(b.mcpTools.length, S.tool)} · ${sum(b.mcpTools)}`,
-        items(servers.map(s => ({ name: `${s.server} (${s.count})`, tokens: s.tokens })))),
-      group('skills', input.expanded, `${plural(b.skills?.totalSkills ?? 0, S.skill)} · ${fmtTokens(b.skills?.tokens ?? 0)}`, []),
-      group('agents', input.expanded, `${plural(b.agents.length, S.agent)} · ${sum(b.agents)}`,
-        items(b.agents.map(a => ({ name: a.agentType, tokens: a.tokens })))),
+      { key: 'memory', summary: `${S.memory} ${b.memoryFiles.length} · ${sum(b.memoryFiles)}`, items: b.memoryFiles.map(f => item(tail(f.path, inner - 10), f.tokens)) },
+      { key: 'mcp', summary: `MCP ${servers.length} · ${sum(b.mcpTools)}`, items: servers.map(s => item(`${s.server} (${s.count})`, s.tokens)) },
+      { key: 'skills', summary: `${S.skills} ${b.skills?.totalSkills ?? 0} · ${fmtTokens(b.skills?.tokens ?? 0)}`, items: [] },
+      { key: 'agents', summary: `${S.agents} ${b.agents.length}`, items: b.agents.map(a => item(a.agentType, a.tokens)) },
     )
   }
   const isEstimate = b !== null && usage.breakdownDetail === 'summary'
-  return { key: 'context', title: isEstimate ? `${S.context} ≈` : S.context, lines, groups }
+  return {
+    title: [{ text: isEstimate ? `${S.context} ≈` : S.context, color: 'claude', bold: true }],
+    aside: [{ text: label.text, color: tone }],
+    rows,
+    groups,
+  }
 }
 
-const quotas = (usage: UsageView, width: number, now: number): Section | null => {
-  if (usage.rateLimits.length === 0) return null
-  const lines: Line[] = []
-  for (const r of usage.rateLimits) {
-    lines.push(quotaParts(r, width, now, true))
-    const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
-    if (Number.isFinite(resetsAt)) {
-      const left = r.kind in WINDOW_MS ? `⧗${fmtDur(Math.max(0, resetsAt - now))} · ` : ''
-      lines.push([dim(`   ${left}${S.resets} ${fmtClock(resetsAt)}`)])
-    }
+const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
+  const label = dim(`${r.kind === 'five_hour' ? '5h' : r.kind === 'seven_day' ? '7d' : r.kind} `)
+  const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
+  const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
+  const burn = duration && Number.isFinite(resetsAt) ? computeBurn(r.percentUsed, resetsAt, duration, now) : null
+  if (!burn) {
+    const tone = contextTone(r.percentUsed)
+    const rows: Row[] = [
+      { left: [label, ...cellsToParts(lineBar(r.percentUsed / 100, width, tone))], right: [{ text: `${Math.round(r.percentUsed)}%`, color: tone }] },
+    ]
+    if (Number.isFinite(resetsAt)) rows.push({ left: [dim(`   ${S.resets} ${fmtClock(resetsAt)}`)] })
+    return rows
   }
-  return { key: 'quotas', title: S.quotas, lines, groups: [] }
+  return [
+    {
+      left: [label, ...cellsToParts(burnBar(burn, width)), dim(` ${Math.round(r.percentUsed)}%`)],
+      right: [{ text: `${projectionText(burn)} ${burnVerdict(burn)}`, color: projectionTone(burn) }],
+    },
+    { left: [dim(`   ⧗${fmtDur(burn.remainingMs)} · ${S.resets} ${fmtClock(resetsAt)}`)] },
+  ]
+}
+
+const quotas = (usage: UsageView, input: PaneInput): Section | null => {
+  if (usage.rateLimits.length === 0) return null
+  // Room for the label, the used share and a verdict as long as `→ ~>999% ⚠ wall 23h59`.
+  const width = Math.max(4, Math.min(input.settings.barWidth, input.columns - FRAME - 30))
+  return {
+    title: [{ text: S.quotas, color: 'claude', bold: true }],
+    aside: [],
+    rows: usage.rateLimits.flatMap(r => quotaRows(r, width, input.now)),
+    groups: [],
+  }
 }
 
 const session = ({ usage, counters, receipt, now }: PaneInput): Section => {
-  const lines: Line[] = []
+  const rows: Row[] = []
   if (usage) {
     const rates = costRates(usage.costUsd, usage.startedAt, now, usage.prompts)
-    if (usage.costUsd !== undefined) {
-      const cost: Line = [{ text: fmtUsd(usage.costUsd), color: 'warning' }]
-      if (rates.perHour !== null) cost.push(sep, dim(`${fmtUsd(rates.perHour)}/h`))
-      if (rates.perPrompt !== null) cost.push(sep, dim(`${fmtUsd(rates.perPrompt)}/${S.prompt}`))
-      lines.push(cost)
-    }
-    lines.push([dim(`${fmtDur(now - usage.startedAt)} · ${plural(usage.prompts, S.prompt)}`)])
+    const rateText = [rates.perHour === null ? null : `${fmtUsd(rates.perHour)}/h`, rates.perPrompt === null ? null : `${fmtUsd(rates.perPrompt)}/${S.prompt}`]
+      .filter(Boolean)
+      .join(' · ')
+    rows.push({ left: [dim(rateText)], right: [dim(`${fmtDur(now - usage.startedAt)} · ${plural(usage.prompts, S.prompt)}`)] })
   }
-  lines.push([dim(`${S.sinceOpen}: ${plural(counters.compactions, S.compaction)} · ${plural(counters.subagents, S.subagent)}`)])
+  rows.push({ left: [dim(S.sinceOpen)], right: [dim(`${plural(counters.compactions, S.compaction)} · ${plural(counters.subagents, S.subagent)}`)] })
   const tools = Object.entries(counters.tools).sort((a, b) => b[1] - a[1])
   if (tools.length > 0) {
     const shown = tools.slice(0, MAX_TOOLS).map(([name, n]) => `${name} ${n}`).join(' · ')
-    const more = tools.length > MAX_TOOLS ? ` · +${tools.length - MAX_TOOLS} ${S.more}` : ''
-    lines.push([dim(`${shown}${more}`)])
+    rows.push({ left: [dim(`${shown}${tools.length > MAX_TOOLS ? ` · +${tools.length - MAX_TOOLS} ${S.more}` : ''}`)] })
   }
-  if (receipt?.isRunning) lines.push([{ text: `${S.turnRunning} ${fmtSpan(now - receipt.startedAt)}`, color: 'claude' }])
+  if (receipt?.isRunning) rows.push({ left: [{ text: `${S.turnRunning} ${fmtSpan(now - receipt.startedAt)}`, color: 'claude' }] })
   else if (receipt) {
-    const head: Line = [{ text: `${S.lastTurn} ${fmtSpan(receipt.durationMs ?? 0)}` }]
-    if (receipt.costAddedUsd !== null) head.push(sep, { text: `+${fmtUsd(receipt.costAddedUsd)}`, color: 'warning' })
-    lines.push(head)
+    rows.push({
+      left: [{ text: `${S.lastTurn} ${fmtSpan(receipt.durationMs ?? 0)}` }],
+      right: receipt.costAddedUsd === null ? [] : [{ text: `+${fmtUsd(receipt.costAddedUsd)}`, color: 'warning' }],
+    })
     const counts = [plural(receipt.agents, S.agent), plural(receipt.edits, S.edit), plural(receipt.errors, S.error)].join(' · ')
-    lines.push([{ text: `  ${counts}`, color: receipt.errors > 0 ? 'error' : undefined, dim: receipt.errors === 0 }])
+    rows.push({ left: [receipt.errors > 0 ? { text: `  ${counts}`, color: 'error' } : dim(`  ${counts}`)] })
   }
-  return { key: 'session', title: S.session, lines, groups: [] }
+  const cost = usage?.costUsd
+  return { title: [{ text: S.session, color: 'claude', bold: true }], aside: cost === undefined ? [] : [{ text: fmtUsd(cost), color: 'warning' }], rows, groups: [] }
 }
 
 const repo = ({ git, columns }: PaneInput): Section | null => {
   if (!git) return null
-  const lines: Line[] = [[dim(tail(git.cwd, columns))]]
-  if (git.repo) lines.push([{ text: git.repo }])
-  if (git.branch) {
-    const line: Line = [
-      { text: ` ${git.branch}`, color: 'ide' },
-      { text: ` +${git.added}`, color: 'diffAdded' },
-      { text: ` −${git.removed}`, color: 'diffRemoved' },
-      sep,
-      dim(plural(git.files, S.file)),
-    ]
-    if (git.ahead !== null && git.behind !== null) line.push(sep, dim(`↑${git.ahead} ↓${git.behind}`))
-    lines.push(line)
+  const inner = columns - FRAME
+  const rows: Row[] = [{ left: [dim(tail(git.cwd, inner))] }]
+  if (git.repo || git.branch) {
+    const diff: Part[] = git.branch
+      ? [
+          { text: `+${git.added}`, color: 'diffAdded' },
+          { text: ` −${git.removed}`, color: 'diffRemoved' },
+          dim(` · ${plural(git.files, S.file)}${git.ahead !== null && git.behind !== null ? ` · ↑${git.ahead} ↓${git.behind}` : ''}`),
+        ]
+      : []
+    rows.push({ left: git.repo ? [{ text: git.repo }] : [], right: diff })
   }
   if (git.sessionFiles.length > 0) {
-    lines.push([dim(`${S.thisSession}:`)])
-    for (const f of git.sessionFiles.slice(0, MAX_FILES)) lines.push([{ text: `  ${tail(f, columns - 2)}` }])
-    if (git.sessionFiles.length > MAX_FILES) lines.push([dim(`  +${git.sessionFiles.length - MAX_FILES} ${S.more}`)])
+    rows.push({ left: [dim(`${S.thisSession}:`)] })
+    for (const f of git.sessionFiles.slice(0, MAX_FILES)) rows.push({ left: [{ text: `  ${tail(f, inner - 2)}` }] })
+    if (git.sessionFiles.length > MAX_FILES) rows.push({ left: [dim(`  +${git.sessionFiles.length - MAX_FILES} ${S.more}`)] })
   }
-  return { key: 'repo', title: S.repo, lines, groups: [] }
+  return {
+    title: [{ text: S.repo, color: 'claude', bold: true }],
+    aside: git.branch ? [{ text: ` ${git.branch}`, color: 'ide' }] : [],
+    rows,
+    groups: [],
+  }
 }
 
-/** The pane's sections in order; one with nothing to say is left out. */
-export const paneSections = (input: PaneInput): Section[] => {
-  const width = Math.max(4, Math.min(input.settings.barWidth, input.columns - 22))
-  const sections: (Section | null)[] = [
+/** The pane's boxes in order, each framed; a section with nothing to say is left out. */
+export const paneRows = (input: PaneInput): PaneRow[] => {
+  const sections = [
     header(input),
-    input.usage && context(input, input.usage, width),
-    input.usage && quotas(input.usage, width, input.now),
+    input.usage && context(input.usage, input.columns),
+    input.usage && quotas(input.usage, input),
     session(input),
     repo(input),
-  ]
-  return sections
-    .filter((s): s is Section => s !== null)
-    .map(s => ({
-      ...s,
-      lines: s.lines.map(l => fitLine(l, input.columns)),
-      groups: s.groups.map(g => ({ ...g, summary: fitLine(g.summary, input.columns), items: g.items.map(l => fitLine(l, input.columns)) })),
-    }))
+  ].filter((s): s is Section => s !== null)
+  return sections.flatMap(s => [
+    { kind: 'text' as const, parts: frameTop(s.title, s.aside, input.columns) },
+    ...s.rows.map(r => frameRow(r, input.columns)),
+    ...frameGroups(s.groups, input.expanded, input.columns),
+    frameBottom(input.columns),
+  ])
 }

@@ -55,4 +55,8 @@ export const S = {
   settingsTitle: 'Status settings',
   actionSettings: 'settings',
   settingsOpened: 'Status settings opened.',
+  other: 'other',
+  memory: 'memory',
+  skills: 'skills',
+  agents: 'agents',
 } as const

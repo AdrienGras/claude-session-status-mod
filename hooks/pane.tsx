@@ -4,7 +4,7 @@ import { atom, read, update } from 'claude-code'
 
 import type { Part } from './parts'
 import { toBreakdownView } from './context'
-import { paneSections } from './pane-rows'
+import { paneRows } from './pane-rows'
 import { normalizeSettings } from './settings'
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import { S } from './strings'
@@ -24,7 +24,7 @@ export const registerPane = (on: On): void => {
   on('ui.render', { component: 'Pane', requestId: PANE_ID }, async ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const columns = e.props.bodyColumns
-    const sections = paneSections({
+    const rows = paneRows({
       usage: await read($, usageAtom),
       live: await read($, liveAtom),
       counters: await read($, countersAtom),
@@ -59,26 +59,21 @@ export const registerPane = (on: On): void => {
 
     return (
       <Box flexDirection="column">
-        {sections.map(s => (
-          <Box key={`s-${s.key}`} flexDirection="column" marginBottom={1}>
-            <Text bold color="claude">
-              {s.title}
-            </Text>
-            {s.lines.map(line => (
-              <Text>{draw(line)}</Text>
-            ))}
-            {s.groups.map(g => (
-              <Box flexDirection="column">
+        {rows.map(row =>
+          row.kind === 'text' ? (
+            <Text>{draw(row.parts)}</Text>
+          ) : (
+            <Box flexDirection="row">
+              <Text>{draw(row.lead)}</Text>
+              {row.groups.map(g => (
                 <Button key={`g-${g.key}`} label={g.key} plain onPress={() => toggle(g.key)}>
-                  {draw(g.summary)}
+                  {draw(g.parts)}
                 </Button>
-                {g.items.map(line => (
-                  <Text>{draw(line)}</Text>
-                ))}
-              </Box>
-            ))}
-          </Box>
-        ))}
+              ))}
+              <Text>{draw(row.tail)}</Text>
+            </Box>
+          ),
+        )}
         <Box flexDirection="row">
           <Button key="compact" label={S.actionCompact} hotkey="c" onPress={compact} />
           <Text> </Text>

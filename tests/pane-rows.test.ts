@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { fitLine, paneSections } from '../hooks/pane-rows'
+import { fitLine, paneRows } from '../hooks/pane-rows'
 import type { PaneInput } from '../hooks/pane-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE, emptyCounters } from '../hooks/state'
@@ -51,80 +51,93 @@ const input = (over: Partial<PaneInput> = {}): PaneInput => ({
   ...over,
 })
 
-const text = (line: { text: string }[]) => line.map(p => p.text).join('')
-const sectionText = (i: PaneInput, key: string) => {
-  const s = paneSections(i).find(x => x.key === key)
-  if (!s) return undefined
-  return [s.title, ...s.lines.map(text), ...s.groups.flatMap(g => [text(g.summary), ...g.items.map(text)])].join('\n')
+const text = (parts: { text: string }[]) => parts.map(p => p.text).join('')
+const rowText = (r: ReturnType<typeof paneRows>[number]) =>
+  r.kind === 'groups' ? text(r.lead) + r.groups.map(g => text(g.parts)).join('') + text(r.tail) : text(r.parts)
+const all = (i: PaneInput) => paneRows(i).map(rowText)
+const box = (i: PaneInput, title: string) => {
+  const rows = all(i)
+  const start = rows.findIndex(r => r.startsWith(`╭─ ${title}`))
+  if (start < 0) return undefined
+  const end = rows.findIndex((r, k) => k > start && r.startsWith('╰'))
+  return rows.slice(start, end + 1).join('\n')
 }
 
-test('five sections in order, the estimate marked', () => {
-  const sections = paneSections(input())
-  expect(sections.map(s => s.key)).toEqual(['header', 'context', 'quotas', 'session', 'repo'])
-  expect(sections[1]?.title).toBe('Context ≈')
-  expect(paneSections(input({ usage: { ...input().usage!, breakdownDetail: 'full' } }))[1]?.title).toBe('Context')
+test('one box per section, in order, the estimate marked', () => {
+  const tops = all(input()).filter(r => r.startsWith('╭─ ')).map(r => r.slice(3).split(' ')[0])
+  expect(tops).toEqual(['Opus', 'Context', 'Quotas', 'Session', 'Repo'])
+  expect(box(input(), 'Context ≈')).toBeDefined()
+  expect(box(input({ usage: { ...input().usage!, breakdownDetail: 'full' } }), 'Context ─')).toBeDefined()
 })
 
-test('header: model, effort, mode, state, requests, speed, window', () => {
-  const t = sectionText(input(), 'header')!
-  for (const s of ['Opus 5.5', 'effort ▮▮▮▯▯ high', 'mode auto', '○ idle', '3 req', 'ttft 0.8s · 42 tok/s', 'window 1M (model-default)']) expect(t).toContain(s)
-  expect(sectionText(input({ live: { ...EMPTY_LIVE, model: 'claude-opus-5-5', isWorking: true } }), 'header')).toContain('● working')
-  expect(sectionText(input({ live: { ...EMPTY_LIVE, model: 'x' } }), 'header')).not.toContain('ttft')
+test('every row spans the pane exactly, however long its content', () => {
+  for (const columns of [48, 60]) {
+    const long = input({
+      columns,
+      git: { ...input().git!, cwd: `/srv/${'very-long-directory/'.repeat(6)}x`, sessionFiles: [`${'deep/'.repeat(20)}file.ts`] },
+      expanded: ['memory', 'mcp', 'agents'],
+    })
+    for (const r of all(long)) expect([...r].length).toBe(columns)
+  }
 })
 
-test('context: legend by category and the room before auto-compaction', () => {
-  const t = sectionText(input(), 'context')!
-  expect(t).toContain('140k/1M 14%')
+test('header: model and state in the frame, effort, mode, requests, speed, window', () => {
+  const t = box(input(), 'Opus 5.5')!
+  expect(t.split('\n')[0]).toContain('○ idle')
+  for (const s of ['effort ▮▮▮▯▯ high', 'mode auto', '3 req', 'ttft 0.8s · 42 tok/s', 'window 1M']) expect(t).toContain(s)
+  expect(box(input({ live: { ...EMPTY_LIVE, model: 'claude-opus-5-5', isWorking: true } }), 'Opus 5.5')).toContain('● working')
+  expect(box(input({ live: { ...EMPTY_LIVE, model: 'x' } }), 'x')).not.toContain('ttft')
+})
+
+test('context: the figure in the frame, the biggest categories, the room before compaction', () => {
+  const t = box(input(), 'Context ≈')!
+  expect(t.split('\n')[0]).toContain('140k/1M 14%')
   expect(t).toContain('Messages')
-  expect(t).toContain('auto-compact in 20k')
+  expect(t).toMatch(/auto-compact in +20k/)
 })
 
-test('context groups unfold on demand', () => {
-  const closed = paneSections(input()).find(s => s.key === 'context')!.groups
-  expect(closed.map(g => g.key)).toEqual(['memory', 'mcp', 'skills', 'agents'])
-  expect(closed.every(g => g.items.length === 0)).toBe(true)
-  expect(text(closed[1]!.summary)).toContain('1 MCP server')
-  const open = paneSections(input({ expanded: ['mcp'] })).find(s => s.key === 'context')!.groups
-  expect(open[1]!.items.map(text).join('\n')).toContain('github')
+test('the legend keeps four categories, folds the rest in other, hides the empty ones', () => {
+  const cats = ['A', 'B', 'C', 'D', 'E', 'F'].map((name, i) => ({ name, tokens: (6 - i) * 1_000, color: 'claude', kind: 'used' as const }))
+  const usage = { ...input().usage!, tokens: 21_000, breakdown: { ...input().usage!.breakdown!, categories: [...cats, { name: 'Zero', tokens: 0, color: 'claude', kind: 'used' as const }] } }
+  const t = box(input({ usage }), 'Context ≈')!
+  for (const name of ['A', 'B', 'C', 'D']) expect(t).toMatch(new RegExp(`■ ${name} `))
+  expect(t).not.toMatch(/■ E /)
+  expect(t).toMatch(/other +3k/)
+  expect(t).not.toContain('Zero')
 })
 
-test('quotas: burn bars with reset time; none when the account reports none', () => {
-  const t = sectionText(input(), 'quotas')!
-  expect(t).toContain('→ 40%')
-  expect(t).toContain(' 20%')
-  expect(t).toContain('⧗2h30')
+test('context lists unfold on demand, two to a row', () => {
+  const rows = paneRows(input()).filter(r => r.kind === 'groups')
+  expect(rows.length).toBe(2)
+  expect(rows.flatMap(r => (r.kind === 'groups' ? r.groups.map(g => g.key) : []))).toEqual(['memory', 'mcp', 'skills', 'agents'])
+  expect(all(input()).join('\n')).toContain('▸ MCP 1 · 1k')
+  expect(all(input({ expanded: ['mcp'] })).join('\n')).toContain('github')
+})
+
+test('quotas: used, projection and verdict, then the reset; no box without windows', () => {
+  const t = box(input(), 'Quotas')!
+  for (const s of [' 20%', '→ 40% ✓ +7h30', '⧗2h30']) expect(t).toContain(s)
   expect(t).toMatch(/resets \d\d:\d\d/)
-  expect(sectionText(input({ usage: { ...input().usage!, rateLimits: [] } }), 'quotas')).toBe(undefined)
+  expect(box(input({ usage: { ...input().usage!, rateLimits: [] } }), 'Quotas')).toBe(undefined)
 })
 
 test('a spend limit past 100% is a plain gauge with its real value', () => {
-  const t = sectionText(input({ usage: { ...input().usage!, rateLimits: [{ kind: 'spend_limit', percentUsed: 112 }] } }), 'quotas')!
+  const t = box(input({ usage: { ...input().usage!, rateLimits: [{ kind: 'spend_limit', percentUsed: 112 }] } }), 'Quotas')!
   expect(t).toContain('112%')
   expect(t).not.toContain('→')
 })
 
-test('session: cost rates, counts since open, last turn', () => {
-  const t = sectionText(input(), 'session')!
-  for (const s of ['$4.80', '$2.40/h', '$0.20/prompt', '2h', '24 prompts', 'since open', '1 compaction', '2 subagents', 'Read 9', 'last turn 7s', '2 edits', '+$0.15']) expect(t).toContain(s)
+test('session: cost in the frame, rates, counts since open, last turn', () => {
+  const t = box(input(), 'Session')!
+  expect(t.split('\n')[0]).toContain('$4.80')
+  for (const s of ['$2.40/h', '$0.20/prompt', '2h', '24 prompts', 'since open', '1 compaction', '2 subagents', 'Read 9', 'last turn 7s', '2 edits', '+$0.15']) expect(t).toContain(s)
 })
 
-test('repo: branch, diff, upstream, files of this session', () => {
-  const t = sectionText(input(), 'repo')!
-  for (const s of ['me/project', 'main', '+42', '−7', '3 files', '↑2 ↓0', 'hooks/a.ts']) expect(t).toContain(s)
-  const noUpstream = sectionText(input({ git: { ...input().git!, ahead: null, behind: null } }), 'repo')!
-  expect(noUpstream).not.toContain('↑')
-})
-
-test('nothing runs past a narrow inline pane', () => {
-  const long = input({
-    columns: 60,
-    git: { ...input().git!, cwd: `/srv/${'very-long-directory/'.repeat(6)}x`, sessionFiles: [`${'deep/'.repeat(20)}file.ts`] },
-  })
-  for (const s of paneSections(long)) {
-    for (const line of [...s.lines, ...s.groups.flatMap(g => [g.summary, ...g.items])]) {
-      expect([...text(line)].length <= 60).toBe(true)
-    }
-  }
+test('repo: branch in the frame, diff, upstream, files of this session', () => {
+  const t = box(input(), 'Repo')!
+  expect(t.split('\n')[0]).toContain('main')
+  for (const s of ['me/project', '+42', '−7', '3 files', '↑2 ↓0', 'hooks/a.ts']) expect(t).toContain(s)
+  expect(box(input({ git: { ...input().git!, ahead: null, behind: null } }), 'Repo')).not.toContain('↑')
 })
 
 test('a line too long is cut with an ellipsis', () => {
