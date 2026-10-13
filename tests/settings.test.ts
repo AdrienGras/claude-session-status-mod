@@ -1,3 +1,4 @@
+import type { PluginState } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { DEFAULT_SETTINGS, normalizeSettings } from '../hooks/settings'
@@ -57,4 +58,10 @@ test('bar width steps within 6..24', () => {
 test('the layout switches between beside the hint and a row of its own', () => {
   expect(toggleLayout(BASE).hintLayout).toBe('below')
   expect(toggleLayout(toggleLayout(BASE)).hintLayout).toBe('inline')
+})
+
+test("the state contract's settings are the mod's own, not the engine's Settings", () => {
+  // Type-checked by tsc: inside `declare module 'claude-code'` a bare `Settings` is the engine's.
+  const held = (s: PluginState['session-status']['settings']): Settings => s
+  expect(held(BASE)).toBe(BASE)
 })

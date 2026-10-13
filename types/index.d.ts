@@ -74,6 +74,9 @@ export type UsageView = {
   breakdownDetail: 'summary' | 'full'
 }
 
+/** Inside `declare module 'claude-code'` a bare `Settings` names the engine's own; this one is the mod's. */
+export type ModSettings = Settings
+
 declare module 'claude-code' {
   interface PluginState {
     'session-status': {
@@ -82,7 +85,7 @@ declare module 'claude-code' {
       counters: Counters
       receipt: Receipt | null
       git: GitSnapshot | null
-      settings: Settings
+      settings: ModSettings
       expanded: string[]
     }
   }
