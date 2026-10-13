@@ -95,6 +95,8 @@ const refreshLater = ($: Dollar, finish?: (view: UsageView) => Promise<void>) =>
 export const registerTracking = (on: On): void => {
   // Cost when the running turn began, to tell what it added.
   let costAtTurnStart: number | undefined
+  // Main-loop turns started, to tell a turn's late figures from the next turn's receipt.
+  let turnCount = 0
 
   // The module's one session.start hook (an event takes one per module, and `$` never crosses an
   // import): it registers /sst too.
@@ -175,6 +177,7 @@ export const registerTracking = (on: On): void => {
 
   on('turn.start', async ($, e, next) => {
     const now = await $.clock.now()
+    turnCount += 1
     costAtTurnStart = (await read($, usageAtom))?.costUsd
     await update($, liveAtom, l => ({ ...l, isWorking: true }))
     await update($, receiptAtom, () => ({ isRunning: true, startedAt: now, durationMs: null, agents: 0, edits: 0, errors: 0, costAddedUsd: null }))
@@ -193,7 +196,10 @@ export const registerTracking = (on: On): void => {
     await update($, receiptAtom, rc => rc && { ...rc, isRunning: false, durationMs: now - rc.startedAt })
     // The figures and git come after the turn is handed back, never holding it.
     const costBefore = costAtTurnStart
+    const turn = turnCount
     refreshLater($, async view => {
+      // This turn's receipt only: the next prompt may have started its own meanwhile.
+      if (turnCount !== turn) return
       const added = view.costUsd !== undefined && costBefore !== undefined ? view.costUsd - costBefore : null
       await update($, receiptAtom, rc => rc && { ...rc, costAddedUsd: added })
     })

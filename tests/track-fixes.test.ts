@@ -170,3 +170,17 @@ test('while a turn runs, the drawings tick every second; after it, they rest', a
   await fake.clock.advance(5_000)
   expect(redraws).toBe(0)
 })
+
+test("a turn's cost lands on its own receipt, not the next turn's", async ($, on) => {
+  const fake = fakeEngine(on, { cost: { usd: 1 } } as never)
+  engineTurns(on)
+  await startSession($)
+  await fake.clock.settle()
+  await $.turn.start({ text: 'one', turnId: 'T1' })
+  fake.usage = { ...fake.usage, cost: { usd: 1.5 } } as never
+  await $.turn.complete(answered('T1'))
+  // The next prompt goes in before T1's figures are read.
+  await $.turn.start({ text: 'two', turnId: 'T2' })
+  await fake.clock.settle()
+  expect((await modState($)).receipt).toMatchObject({ isRunning: true, costAddedUsd: null })
+})
