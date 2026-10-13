@@ -1,10 +1,8 @@
-import type { SessionContextBreakdown } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
 import { compactHeadroom, contextLabel, mcpByServer, toSegments } from '../hooks/context'
 
-const cat = (name: string, tokens: number, kind: 'used' | 'free' | 'buffer' | 'deferred', color = 'claude') =>
-  ({ name, tokens, color, kind, isDeferred: kind === 'deferred' })
+const cat = (name: string, tokens: number, kind: 'used' | 'free' | 'buffer' | 'deferred', color = 'claude') => ({ name, tokens, color, kind })
 
 const breakdown = {
   categories: [
@@ -15,7 +13,7 @@ const breakdown = {
     cat('Free space', 859_000, 'free', 'promptBorder'),
   ],
   mcpTools: [],
-} as unknown as SessionContextBreakdown
+}
 
 const sum = (xs: { tokens: number }[]) => xs.reduce((a, b) => a + b.tokens, 0)
 

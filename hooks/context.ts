@@ -1,8 +1,6 @@
 // The context window as segments, labels and the lists the pane unfolds.
-import type { ContextMcpTool, SessionContextBreakdown } from 'claude-code'
-
 import { fmtTokens } from './format'
-import type { Segment } from '../types'
+import type { BreakdownView, Segment } from '../types'
 
 /**
  * The breakdown's categories as bar segments. The breakdown is an estimate: when the real total is
@@ -10,7 +8,7 @@ import type { Segment } from '../types'
  * tokens, so it keeps its size. Deferred rows are not in the window and are dropped; the free
  * segment is whatever the window has left.
  */
-export const toSegments = (breakdown: SessionContextBreakdown, tokens: number | undefined, window: number): Segment[] => {
+export const toSegments = (breakdown: Pick<BreakdownView, 'categories'>, tokens: number | undefined, window: number): Segment[] => {
   const used = breakdown.categories.filter(c => c.kind === 'used')
   const buffer = breakdown.categories.filter(c => c.kind === 'buffer')
   const estimate = used.reduce((a, c) => a + c.tokens, 0)
@@ -32,7 +30,7 @@ export const contextLabel = (tokens: number | undefined, window: number): { text
   return { text: `${fmtTokens(tokens)}/${fmtTokens(window)} ${pct}%`, pct }
 }
 
-export const mcpByServer = (tools: readonly ContextMcpTool[]): { server: string; tokens: number; count: number }[] => {
+export const mcpByServer = (tools: readonly { serverName: string; tokens: number }[]): { server: string; tokens: number; count: number }[] => {
   const by = new Map<string, { server: string; tokens: number; count: number }>()
   for (const t of tools) {
     const row = by.get(t.serverName) ?? { server: t.serverName, tokens: 0, count: 0 }
