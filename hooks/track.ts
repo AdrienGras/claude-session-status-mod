@@ -47,12 +47,21 @@ const REDRAW_MS = 30_000
 let redraw: { cancel: () => void } | null = null
 /** While a turn runs, its timer in the pane counts seconds. */
 const TICK_MS = 1_000
+/** Every this many ticks, the agent list is read again: a killed agent raises no end of its own. */
+const RECONCILE_TICKS = 5
 let tick: { cancel: () => void } | null = null
 
 /** The one-second tick runs while a main turn or a subagent card runs, and rests otherwise. */
 const syncTick = async ($: Dollar) => {
   const isBusy = (await read($, liveAtom)).isWorking || (await read($, agentsAtom)).some(c => c.state === 'running')
-  if (isBusy && !tick) tick = $.clock.every(TICK_MS, () => $.ui.invalidate('ui.render'))
+  if (isBusy && !tick) {
+    let ticks = 0
+    tick = $.clock.every(TICK_MS, () => {
+      ticks += 1
+      if (ticks % RECONCILE_TICKS === 0) void reconcileAgents($).catch(() => undefined)
+      return $.ui.invalidate('ui.render')
+    })
+  }
   else if (!isBusy && tick) {
     tick.cancel()
     tick = null
@@ -255,7 +264,7 @@ export const registerTracking = (on: On): void => {
     await update($, countersAtom, c => ({ ...c, tools: { ...c.tools, [e.tool]: (c.tools[e.tool] ?? 0) + 1 } }))
     if (e.agentId) {
       const agentId = e.agentId
-      await update($, agentsAtom, cs => withCard(cs, agentId, c => callCard(c, e.tool, (e as { input?: unknown }).input)))
+      await update($, agentsAtom, cs => keepCards(withCard(cs, agentId, c => callCard(c, e.tool, (e as { input?: unknown }).input))))
     }
     await update($, receiptAtom, rc =>
       // A denied or failed edit changed no file: an error, not an edit.

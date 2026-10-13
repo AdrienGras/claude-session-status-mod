@@ -140,3 +140,22 @@ test('a background agent keeps the tick after the main turn ends', async ($, on)
   await fake.clock.advance(5_000)
   expect(redraws.n).toBe(0)
 })
+
+test('an agent killed while the session is idle is closed by the tick itself', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  const redraws = countRedraws(on)
+  await startSession($)
+  await fake.clock.settle() // the start's own deferred read is done before the agent exists
+  await spawn($)
+  fake.agents = [{ id: 'a1', status: 'killed', description: '', type: 'Explore' }]
+  await fake.clock.advance(6_000)
+  await fake.clock.settle()
+  const ui = await paneText($)
+  expect(await ui.find({ text: /■/ })).toBeDefined()
+  expect(await ui.find({ text: /●/ })).toBeUndefined()
+  await ui.unmount()
+  redraws.n = 0
+  await fake.clock.advance(5_000)
+  expect(redraws.n).toBe(0)
+})
