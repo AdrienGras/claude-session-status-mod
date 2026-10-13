@@ -1,6 +1,6 @@
 # session-status
 
-A Claude Code mod that replaces your status line with a native card and side pane. It shows the model, effort, context by category, rate-limit windows with a burn-rate projection, session cost and your repo. Everything is read from the session itself: no script polling every few seconds, no separate binary.
+A Claude Code mod that replaces your status line with a native one, under the prompt, and a side pane. It shows the model, effort, context by category, rate-limit windows with a burn-rate projection, session cost and your repo. Everything is read from the session itself: no script polling every few seconds, no separate binary.
 
 Tested on Claude Code **2.1.296**. Mods are an early-access Claude Code feature and their API may change between releases.
 
@@ -16,15 +16,20 @@ Answer `y` to add the marketplace, then pick a scope (user scope loads it in eve
 
 ## What you see
 
-### The card
+### The status line
 
-A framed card at the right edge, just above the prompt, with three lines by default:
+One line under the prompt, where Claude Code draws its hint (`? for shortcuts`), which stays at the left. By default:
 
-- **Model and effort**: `Opus 5.5  effort ▮▮▮▯▯ high`
-- **Context**: a bar coloured by category, the same colours `/context` uses, then `140k/1M 14%`
-- **5h window**: a bar of what you used, a `┊` mark where you would be at an even pace, the projection at reset and the verdict: `→ 40% ✓ +7h30` (time to spare) or `→ 140% ⚠ wall 1h04` (when you hit 100% at this pace)
+```
+? for shortcuts      Opus 5.5 ▮▮▮▯▯ │ ctx ━───────── 4% │ 5h ╸┊──────── 7% → 49% ✓ │ $0.17 ▸
+```
 
-`▸` (or `ctrl+x tab` then `d`) opens the side pane. Claude Code's own `[-]` control on the band, or `ctrl+x ctrl+a`, hides the card.
+- **Model and effort**: the effort as five notches
+- **Context**: a bar coloured by category, the same colours `/context` uses, and the share of the window
+- **5h window**: a bar of what you used, a `┊` mark where you would be at an even pace, then used, the projection at reset and a verdict: `✓` time to spare, `⚠` you hit 100% before the reset at this pace
+- **Cost** of the session
+
+Items that do not fit the terminal are dropped from the right. `▸` opens the side pane. `/sst config` chooses the items and their order.
 
 ### The side pane
 
@@ -32,20 +37,20 @@ A framed card at the right edge, just above the prompt, with three lines by defa
 
 | Section | Shows |
 | --- | --- |
-| Model | model, effort, permission mode, working/idle, requests, time to first token and tokens per second of the last request, context window and where its size comes from |
-| Context | the bar with a legend per category, tokens left before auto-compaction, and unfoldable lists of memory files, MCP servers, skills and agents |
-| Quotas | every window your plan reports: 5h and 7d as burn bars with time to reset and reset clock time; any other window (a spend limit) as a plain gauge |
+| Model | model, effort, permission mode, working/idle, requests, time to first token and tokens per second of the last request, context window |
+| Context | the bar with its four biggest categories (the rest as *other*), tokens left before auto-compaction, and unfoldable lists of memory files, MCP servers and agents |
+| Quotas | every window your plan reports: 5h and 7d as burn bars with used share, projection, verdict, time to reset and reset clock time; any other window (a spend limit) as a plain gauge |
 | Session | cost, cost per hour and per prompt, duration, prompts, compactions, tool calls by tool, subagents, and the last turn (duration, cost added, agents, edits, errors) |
 | Repo | folder, `owner/repo`, branch, `+added −removed`, files changed, ahead/behind upstream, files changed during this session |
 
-Buttons: **compact** runs `/compact` after asking, **recount** counts the context exactly as `/context` does, **settings** opens the settings pane.
+Each section is a framed box with its key figure in the frame. Buttons: **compact** runs `/compact` after asking, **recount** counts the context exactly as `/context` does, **settings** opens the settings pane.
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
 | `/sst` | open or close the side pane |
-| `/sst config` | open the settings pane: which lines the card shows, their order, bar width (6–24) |
+| `/sst config` | open the settings pane: which items the status line shows, their order, bar width (6–24) |
 | `/sst debug` | print what the mod reads, for a bug report |
 
 `/sst debug` prints figures and categories only: no path, MCP server, agent, skill, repo or branch name. It is safe to paste in an issue.
@@ -77,7 +82,7 @@ claude plugin test .
 claude --plugin-dir .
 ```
 
-The pure logic (formatting, burn rate, bars, context, git parsing, card and pane lines) lives in `hooks/*.ts` and is unit-tested. The `*.tsx` files only draw. All displayed strings are in `hooks/strings.ts`.
+The pure logic (formatting, burn rate, bars, context, git parsing, status line and pane rows) lives in `hooks/*.ts` and is unit-tested. The `*.tsx` files only draw. All displayed strings are in `hooks/strings.ts`.
 
 ## License
 
