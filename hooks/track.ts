@@ -103,10 +103,11 @@ export const registerTracking = (on: On): void => {
     await update($, liveAtom, l => ({ ...l, model: l.model ?? model }))
     const stored = await $.store.get(SETTINGS_KEY)
     await update($, settingsAtom, () => normalizeSettings(stored))
-    // A fresh process starts counting; a reloaded module keeps the counts of this session.
-    await refreshUsage($)
     redraw?.cancel()
     redraw = $.clock.every(REDRAW_MS, () => $.ui.invalidate('ui.render'))
+    // A fresh process starts counting; a reloaded module keeps the counts of this session. A read
+    // refused this early is tried again just after.
+    await refreshUsage($).catch(() => undefined)
     refreshLater($)
     return r
   })

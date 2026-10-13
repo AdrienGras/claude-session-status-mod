@@ -128,3 +128,14 @@ test('/clear re-reads the figures and git for the new conversation', async ($, o
   // Within the git cache's TTL, but for a new conversation: read again.
   expect(runs.some(r => r.includes('status'))).toBe(true)
 })
+
+test('the redraw is armed even when the first usage read fails', async ($, on) => {
+  const fake = fakeEngine(on)
+  fake.usageFailures = 1
+  let redraws = 0
+  on('ui.invalidate', () => ((redraws += 1), { value: undefined }))
+  await startSession($)
+  await fake.clock.advance(60_000)
+  expect(fake.usageCalls.length >= 2).toBe(true)
+  expect(redraws >= 2).toBe(true)
+})

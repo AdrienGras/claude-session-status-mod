@@ -14,6 +14,8 @@ export type FakeEngine = {
   commandSpecs: { name: string; immediate?: true }[]
   clock: MockClock
   usageCalls: unknown[]
+  /** Usage reads refused before the next one answers (an engine not ready yet). */
+  usageFailures: number
   repo: { root: string; remote: string | null } | null
 }
 
@@ -33,6 +35,7 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     commandSpecs: [],
     clock: mock.clock(on),
     usageCalls: [],
+    usageFailures: 0,
     repo: null,
   }
   mock.store(on)
@@ -40,7 +43,14 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
   on('session.repo', () => ({ value: fake.repo && { ...fake.repo, internal: false, name: null } }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => (fake.commands.push(e.name), fake.commandSpecs.push(e), { value: { command: e.name } }))
-  on('session.usage', (_$, e) => (fake.usageCalls.push(e), { value: fake.usage }))
+  on('session.usage', (_$, e) => {
+    fake.usageCalls.push(e)
+    if (fake.usageFailures > 0) {
+      fake.usageFailures -= 1
+      throw new Error('usage not ready')
+    }
+    return { value: fake.usage }
+  })
   on('session.model', () => ({ value: fake.model }))
   on('session.turns', () => ({ value: fake.turns }))
   on('ui.open', (_$, e) => {
