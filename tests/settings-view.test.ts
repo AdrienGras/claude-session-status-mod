@@ -24,10 +24,10 @@ test('turning a line off is kept and survives a new session', async ($, on) => {
   const ui = await $.ui.mount(configTarget())
   expect(await ui.find({ text: /\[x\] 5h window/ })).toBeDefined()
   await ui.press({ key: 'line-five_hour' })
-  expect((await modState($)).settings.cardLines).toEqual(['model', 'context', 'cost'])
+  expect((await modState($)).settings.cardLines).toEqual(['model', 'context'])
   await ui.unmount()
   await startSession($)
-  expect((await modState($)).settings.cardLines).toEqual(['model', 'context', 'cost'])
+  expect((await modState($)).settings.cardLines).toEqual(['model', 'context'])
 })
 
 test('bars widen up to 24 and no further', async ($, on) => {

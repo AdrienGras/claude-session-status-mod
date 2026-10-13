@@ -24,11 +24,15 @@ const text = (parts: { text: string }[]) => parts.map(p => p.text).join('')
 const bar = (over: Partial<Parameters<typeof minibarParts>[0]> = {}, cols = 200) =>
   text(minibarParts({ usage, live, git: null, settings: DEFAULT_SETTINGS, now: NOW, ...over }, cols))
 
-test('the default line: model and effort, context, the 5h window, cost', () => {
+test('the default line: model and effort, context, the 5h window', () => {
   const t = bar()
   expect(t.startsWith('Opus 5.5 ▮▮▮▯▯ │ ctx ')).toBe(true)
   expect(t).toContain(' 14% │ 5h ')
-  expect(t).toContain(' 20% → 40% ✓ │ $4.82')
+  expect(t.endsWith(' 20% → 40% ✓')).toBe(true)
+})
+
+test('cost shows when asked for', () => {
+  expect(bar({ settings: { ...DEFAULT_SETTINGS, cardLines: ['model', 'cost'] } })).toBe('Opus 5.5 ▮▮▮▯▯ │ $4.82')
 })
 
 test('no rate limits: no quota item', () => {
@@ -66,6 +70,6 @@ test('items that do not fit are dropped from the right', () => {
   const narrow = bar({}, 40)
   expect([...narrow].length <= 40).toBe(true)
   expect(narrow.startsWith('Opus 5.5 ▮▮▮▯▯')).toBe(true)
-  expect(narrow).not.toContain('$4.82')
+  expect(narrow).not.toContain('5h')
   expect(bar({}, 5)).toBe('')
 })

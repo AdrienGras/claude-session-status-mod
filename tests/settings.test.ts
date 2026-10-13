@@ -2,8 +2,8 @@ import { expect, test } from 'claude-code/testing'
 
 import { DEFAULT_SETTINGS, normalizeSettings } from '../hooks/settings'
 
-test('defaults: model, context, the 5h window and cost, bars 10 wide', () => {
-  expect(DEFAULT_SETTINGS).toEqual({ cardLines: ['model', 'context', 'five_hour', 'cost'], barWidth: 10 })
+test('defaults: model, context and the 5h window, bars 10 wide', () => {
+  expect(DEFAULT_SETTINGS).toEqual({ cardLines: ['model', 'context', 'five_hour'], barWidth: 10 })
   expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS)
   expect(normalizeSettings('junk')).toEqual(DEFAULT_SETTINGS)
 })

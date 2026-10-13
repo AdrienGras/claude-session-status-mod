@@ -3,7 +3,7 @@ import type { CardLine, Settings } from '../types'
 
 export const CARD_LINES: readonly CardLine[] = ['model', 'context', 'five_hour', 'seven_day', 'cost', 'repo']
 
-export const DEFAULT_SETTINGS: Settings = { cardLines: ['model', 'context', 'five_hour', 'cost'], barWidth: 10 }
+export const DEFAULT_SETTINGS: Settings = { cardLines: ['model', 'context', 'five_hour'], barWidth: 10 }
 
 const MIN_WIDTH = 6
 const MAX_WIDTH = 24
