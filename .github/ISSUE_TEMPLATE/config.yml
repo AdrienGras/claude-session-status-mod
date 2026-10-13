@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/AdrienGras/claude-session-status-mod/security/advisories/new
+    about: Report it privately, not in a public issue.
+  - name: Bug in Claude Code itself
+    url: https://github.com/anthropics/claude-code/issues
+    about: The mod API, panes or the prompt misbehaving without this mod.

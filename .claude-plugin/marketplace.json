@@ -2,13 +2,13 @@
   "name": "claude-session-status-mod",
   "owner": { "name": "AdrienGras", "url": "https://github.com/AdrienGras" },
   "metadata": {
-    "description": "session-status: a native Claude Code status card and side pane."
+    "description": "session-status: a native Claude Code status line and side pane."
   },
   "plugins": [
     {
       "name": "session-status",
       "source": "./",
-      "description": "Model, effort, context by category, quotas with burn-rate projection, cost and repo, in a card above the prompt and a side pane."
+      "description": "Model, effort, context by category, quotas with burn-rate projection, cost and repo, in a status line under the prompt and a side pane."
     }
   ]
 }

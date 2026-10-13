@@ -1,0 +1,56 @@
+name: Bug report
+description: Something looks wrong or doesn't work.
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! English or French, both are fine.
+        Security issue? Please [report it privately](https://github.com/AdrienGras/claude-session-status-mod/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead. A screenshot helps for anything visual.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the side pane with /sst
+        2. …
+    validations:
+      required: false
+  - type: textarea
+    id: debug
+    attributes:
+      label: /sst debug output
+      description: Run `/sst debug` in the session where it happened and paste the output. It holds figures and categories only, nothing local.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code version
+      description: Output of `claude --version`.
+      placeholder: 2.1.296
+    validations:
+      required: true
+  - type: input
+    id: mod-version
+    attributes:
+      label: session-status version
+      description: Shown by `/plugin` in the installed plugins list.
+      placeholder: 0.1.1
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and OS
+      placeholder: Ghostty on macOS 26, Windows Terminal + WSL…
+    validations:
+      required: false
