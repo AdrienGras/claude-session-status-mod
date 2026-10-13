@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
-import { fakeEngine, modState, startSession } from './engine'
+import { answered, fakeEngine, modState, startSession } from './engine'
 
 const messages = [{ role: 'user', text: 'x', toolUses: [] }]
 const usage = { input_tokens: 1, output_tokens: 10, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
@@ -83,7 +83,7 @@ test('git runs after the turn is handed back, not inside it', async ($, on) => {
   await fake.clock.advance(10_000)
   runs.length = 0
   await $.turn.start({ text: 'go', turnId: 'T1' })
-  await $.turn.complete({ turnId: 'T1', reason: 'end_turn', answer: '', text: '', isAborted: false } as never)
+  await $.turn.complete(answered('T1'))
   expect(runs).toEqual([])
   await fake.clock.advance(10)
   expect(runs.some(r => r.includes('status'))).toBe(true)
@@ -165,7 +165,7 @@ test('while a turn runs, the drawings tick every second; after it, they rest', a
   await $.turn.start({ text: 'go', turnId: 'T1' })
   await fake.clock.advance(5_000)
   expect(redraws >= 4).toBe(true)
-  await $.turn.complete({ turnId: 'T1', reason: 'end_turn', answer: '', text: '', isAborted: false } as never)
+  await $.turn.complete(answered('T1'))
   redraws = 0
   await fake.clock.advance(5_000)
   expect(redraws).toBe(0)

@@ -75,3 +75,28 @@ test('/sst brings back a pane hidden behind another tab instead of closing it', 
   expect(fake.openPanes.has('sst')).toBe(true)
   expect(fake.hiddenPanes.has('sst')).toBe(false)
 })
+
+test("the engine's breakdown reaches the Context box", async ($, on) => {
+  const fake = fakeEngine(on, {
+    context: {
+      tokens: 140_000,
+      window: 1_000_000,
+      percent: 14,
+      breakdown: {
+        categories: [{ name: 'Messages', tokens: 120_000, color: 'claude', kind: 'used', isDeferred: false }],
+        memoryFiles: [{ path: '/w/CLAUDE.md', type: 'Project', tokens: 2_000 }],
+        mcpTools: [],
+        agents: [],
+        gridRows: [],
+        isAutoCompactEnabled: true,
+        autoCompactThreshold: 900_000,
+      },
+    } as never,
+  })
+  await startSession($)
+  await fake.clock.settle()
+  const ui = await $.ui.mount(paneTarget())
+  expect(await ui.find({ text: /Messages/ })).toBeDefined()
+  expect(await ui.find({ text: /memory 1/ })).toBeDefined()
+  await ui.unmount()
+})

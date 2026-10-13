@@ -1,5 +1,5 @@
 // A stand-in for the engine beneath the plugin, shared by the integration tests.
-import type { On, SessionUsage } from 'claude-code'
+import type { On, SessionUsage, TurnCompleteInput } from 'claude-code'
 import { mock } from 'claude-code/testing'
 import type { MockClock } from 'claude-code/testing'
 
@@ -67,6 +67,9 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
 
 export const startSession = ($: { session: { start: (e: never) => Promise<unknown> } }) =>
   $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true } as never)
+
+/** A main-loop turn that answered, as the engine raises its end. */
+export const answered = (turnId: string): TurnCompleteInput => ({ turnId, reason: 'answer', answer: '', isAborted: false, durationMs: 1_000 })
 
 // What the engine stamps on a typed slash command.
 export const typed = (command: string, args = '') => ({
