@@ -83,6 +83,13 @@ export const registerPane = (on: On): void => {
           <Button key="compact" label={S.actionCompact} hotkey="c" onPress={compact} />
           <Text> </Text>
           <Button key="recount" label={S.actionRecount} hotkey="r" onPress={recount} />
+          <Text> </Text>
+          <Button
+            key="settings"
+            label={S.actionSettings}
+            hotkey="s"
+            onPress={() => $.ui.open({ id: 'sst-config', title: S.settingsTitle, focus: true, closeOnEscape: true })}
+          />
         </Box>
       </Box>
     )

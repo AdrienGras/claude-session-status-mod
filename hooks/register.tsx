@@ -5,6 +5,7 @@ import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import type { GitSnapshot, Receipt } from '../types'
 import { registerCard } from './card'
 import { PANE_ID, registerPane } from './pane'
+import { CONFIG_PANE_ID, registerSettingsView } from './settings-view'
 import { debugReport } from './debug'
 import { normalizeSettings } from './settings'
 import { S } from './strings'
@@ -20,6 +21,7 @@ export const register: Register = on => {
   registerTracking(on)
   registerCard(on)
   registerPane(on)
+  registerSettingsView(on)
 
   on('command.run', { command: 'sst' }, async ($, e) => {
     const args = e.args.trim()
@@ -33,6 +35,10 @@ export const register: Register = on => {
         settings: normalizeSettings(await read($, settingsAtom)),
       })
       return { text: JSON.stringify(dump, null, 2) }
+    }
+    if (args === 'config') {
+      await $.ui.open({ id: CONFIG_PANE_ID, title: S.settingsTitle, focus: true, closeOnEscape: true })
+      return { text: S.settingsOpened }
     }
     // Bare /sst: the pane, open or closed.
     if ((await $.ui.panes()).some(p => p.id === PANE_ID)) {

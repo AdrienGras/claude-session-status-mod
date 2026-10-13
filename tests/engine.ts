@@ -62,6 +62,7 @@ export const modState = async ($: { command: { run: (e: never) => Promise<unknow
     live: { model: string | null; effort: string | null; isWorking: boolean; requests: number; speed: unknown }
     counters: { compactions: number; tools: Record<string, number>; subagents: number }
     receipt: { edits: number; errors: number; agents: number; isRunning: boolean } | null
+    settings: { cardLines: string[]; barWidth: number }
   }
 }
 
@@ -73,3 +74,5 @@ export const paneTarget = (bodyColumns = 48, placement: 'dock' | 'inline' = 'doc
   props: { title: 'Session', isFocused: true, bodyColumns, placement, scroll: { offset: 0, bodyRows: 80 }, view: {} },
   surface: 'terminal' as const,
 })
+
+export const configTarget = () => ({ ...paneTarget(), requestId: 'sst-config', props: { ...paneTarget().props, title: 'Status settings' } })

@@ -80,7 +80,6 @@ declare module 'claude-code' {
       receipt: Receipt | null
       git: GitSnapshot | null
       settings: Settings
-      view: 'main' | 'settings'
       expanded: string[]
     }
   }
