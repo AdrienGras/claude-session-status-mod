@@ -65,7 +65,7 @@ Pure logic goes in `*.ts` with unit tests; `*.tsx` only draws.
 
 ## Git workflow
 
-- **Never commit or push to `main` directly.** `main` is protected: every change goes through a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and a pull request, merged only once CI is green.
+- **Never commit or push to `main` directly.** `main` is protected: every change goes through a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and a pull request, merged only once CI (`check`) and the SonarCloud quality gate (`SonarCloud Code Analysis`, automatic analysis through the GitHub app, no token) are green.
 - **Before opening a PR**, run the full check above locally (`validate --strict`, `tsc`, `test`) and make sure it passes. CI doesn't run `tsc`, so a type error only shows up locally. If `.github/workflows/` changed, run it with `act` first.
 - **Every user-visible change** gets a line under *Unreleased* in `CHANGELOG.md`, in the same PR (Added / Changed / Fixed / Removed).
 - Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`…), one topic per commit; the PR body says `Closes #N` and fills the template's checklist.

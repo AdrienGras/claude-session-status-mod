@@ -1,6 +1,7 @@
 # 📟 session-status
 
 [![CI](https://github.com/AdrienGras/claude-session-status-mod/actions/workflows/ci.yml/badge.svg)](https://github.com/AdrienGras/claude-session-status-mod/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=AdrienGras_claude-session-status-mod&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=AdrienGras_claude-session-status-mod)
 [![Version](https://img.shields.io/github/v/tag/AdrienGras/claude-session-status-mod?label=version&sort=semver)](https://github.com/AdrienGras/claude-session-status-mod/tags)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code 2.1.296](https://img.shields.io/badge/Claude%20Code-2.1.296%20mod-d97757.svg)](https://claude.com/blog/claude-code-mods)

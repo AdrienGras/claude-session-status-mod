@@ -33,7 +33,7 @@ claude plugin validate --strict . && npx -y -p typescript@5 tsc -p . && claude p
 - `tsc` type-checks against the API's declarations.
 - `claude plugin test` runs every `tests/*.test.ts` with the `claude-code/testing` kit.
 
-CI runs `validate --strict` and the tests on every push and pull request. It does not run `tsc` (the declarations only exist once a logged-in Claude Code has loaded the mod), so run it locally.
+CI runs `validate --strict` and the tests on every push and pull request, and SonarCloud checks every pull request against its quality gate; both must pass before merging. It does not run `tsc` (the declarations only exist once a logged-in Claude Code has loaded the mod), so run it locally.
 
 ## How the code is laid out
 
