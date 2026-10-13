@@ -1,6 +1,6 @@
 // What the compact card says, line by line, as coloured parts; drawing is card.tsx's.
 import type { Cell } from './bars'
-import { burnBar, eighthBar, segmentBar } from './bars'
+import { burnBar, lineBar, segmentBar } from './bars'
 import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
 import { contextLabel, toSegments } from './context'
 import { fmtUsd } from './format'
@@ -47,7 +47,7 @@ export const quotaParts = (r: RateLimit, width: number, now: number, showUsed = 
   const burn = duration && Number.isFinite(resetsAt) ? computeBurn(r.percentUsed, resetsAt, duration, now) : null
   if (!burn) {
     const color = contextTone(r.percentUsed)
-    return [label, ...cellsToParts(eighthBar(r.percentUsed / 100, width, color)), { text: ` ${Math.round(r.percentUsed)}%`, color }]
+    return [label, ...cellsToParts(lineBar(r.percentUsed / 100, width, color)), { text: ` ${Math.round(r.percentUsed)}%`, color }]
   }
   const tone = projectionTone(burn)
   const used: Part[] = showUsed ? [{ text: ` ${Math.round(r.percentUsed)}%`, dim: true }] : []
@@ -61,7 +61,7 @@ export const contextParts = (usage: UsageView, width: number): Part[] => {
   const bar =
     usage.breakdown && usage.tokens !== undefined
       ? segmentBar(toSegments(usage.breakdown, usage.tokens, usage.window), usage.window, width)
-      : eighthBar(label.pct === null ? 0 : label.pct / 100, width, tone)
+      : lineBar(label.pct === null ? 0 : label.pct / 100, width, tone)
   return [{ text: `${S.ctx} `, dim: true }, ...cellsToParts(bar), { text: ` ${label.text}`, color: tone }]
 }
 

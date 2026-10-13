@@ -1,30 +1,35 @@
 import { expect, test } from 'claude-code/testing'
 
-import { burnBar, eighthBar, segmentBar } from '../hooks/bars'
+import { burnBar, lineBar, segmentBar } from '../hooks/bars'
 import { computeBurn, WINDOW_MS } from '../hooks/burn'
 import type { Segment } from '../types'
 
 const text = (cells: { text: string }[]) => cells.map(c => c.text).join('')
 
-test('an eighth-cell bar fills to the eighth', () => {
-  const cells = eighthBar(0.14, 10, 'success')
+test('a thin bar: a line for the filled part, a dim track for the rest', () => {
+  const cells = lineBar(0.14, 10, 'success')
   expect(cells.length).toBe(10)
-  expect(text(cells)).toBe('█▍        ')
+  expect(text(cells)).toBe('━─────────')
   expect(cells[0]?.color).toBe('success')
   expect(cells[2]?.role).toBe('empty')
+  expect(cells[2]?.color).toBe('subtle')
+})
+
+test('a half cell or more shows as a half line', () => {
+  expect(text(lineBar(0.16, 10, 'success'))).toBe('━╸────────')
 })
 
 test('an overflowing or empty bar stays within its width', () => {
-  expect(text(eighthBar(1.12, 10, 'error'))).toBe('██████████')
-  expect(text(eighthBar(0, 10, 'success'))).toBe('          ')
-  expect(text(eighthBar(-1, 4, 'success'))).toBe('    ')
+  expect(text(lineBar(1.12, 10, 'error'))).toBe('━━━━━━━━━━')
+  expect(text(lineBar(0, 10, 'success'))).toBe('──────────')
+  expect(text(lineBar(-1, 4, 'success'))).toBe('────')
 })
 
 test('the burn bar marks where the window says you should be', () => {
   const NOW = 1_000_000_000
   const b = computeBurn(20, NOW + 2.5 * 3_600_000, WINDOW_MS.five_hour, NOW)!
   const cells = burnBar(b, 10)
-  expect(text(cells)).toBe('██   ┊    ')
+  expect(text(cells)).toBe('━━───┊────')
   expect(cells[5]?.role).toBe('marker')
   expect(cells[5]?.color).toBe('text')
   expect(cells[0]?.color).toBe('success')
@@ -38,7 +43,7 @@ test('segments share the bar in proportion, free space left empty', () => {
   expect(cells.filter(c => c.color === 'warning').length).toBe(4)
   const withFree = segmentBar([seg(140_000, 'claude'), seg(860_000, 'promptBorder', 'free')], 1_000_000, 10)
   expect(withFree.length).toBe(10)
-  expect(text(withFree)).toBe('█         ')
+  expect(text(withFree)).toBe('━─────────')
 })
 
 test('a segmented bar always spans its width', () => {

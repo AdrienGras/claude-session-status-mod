@@ -1,30 +1,31 @@
-// Text bars, one Cell per terminal column, coloured by theme keys.
+// Thin text bars, one Cell per terminal column, coloured by theme keys.
 import type { Burn } from './burn'
 import { projectionTone } from './burn'
 import type { Segment } from '../types'
 
 export type Cell = { text: string; color?: string; role: 'fill' | 'marker' | 'empty' }
 
-const PARTIALS = '▏▎▍▌▋▊▉' // 1/8 .. 7/8
-const FULL = '█'
+const FULL = '━'
+const HALF = '╸'
 const MARKER = '┊'
-const EMPTY: Cell = { text: ' ', role: 'empty' }
+/** The track: the bar's empty part, drawn dim so the level reads against it. */
+const EMPTY: Cell = { text: '─', color: 'subtle', role: 'empty' }
 
-/** `fraction` of `width` filled to the eighth of a cell; the rest blank. */
-export const eighthBar = (fraction: number, width: number, color: string): Cell[] => {
+/** `fraction` of `width` as a thin line, a half line for half a cell or more; the rest a dim track. */
+export const lineBar = (fraction: number, width: number, color: string): Cell[] => {
   const exact = Math.min(1, Math.max(0, fraction)) * width
   const full = Math.floor(exact)
-  const step = Math.floor((exact - full) * 8)
+  const isHalf = exact - full >= 0.5
   return Array.from({ length: width }, (_, i): Cell => {
     if (i < full) return { text: FULL, color, role: 'fill' }
-    if (i === full && step > 0) return { text: PARTIALS[step - 1]!, color, role: 'fill' }
+    if (i === full && isHalf) return { text: HALF, color, role: 'fill' }
     return EMPTY
   })
 }
 
 /** The used share, plus `┊` where the elapsed time says usage should be. */
 export const burnBar = (b: Burn, width: number): Cell[] => {
-  const cells = eighthBar(b.usedPct / 100, width, projectionTone(b))
+  const cells = lineBar(b.usedPct / 100, width, projectionTone(b))
   const at = Math.min(width - 1, Math.floor(Math.min(1, Math.max(0, b.elapsedFrac)) * width))
   cells[at] = { text: MARKER, color: 'text', role: 'marker' }
   return cells
