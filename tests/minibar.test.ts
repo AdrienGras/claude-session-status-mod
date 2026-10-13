@@ -106,3 +106,7 @@ test('the budget counts cells: a wide ⛔ does not run past it', () => {
   const codePoints = [...all].length
   expect(cellWidth(bar({ usage: full }, codePoints)) <= codePoints).toBe(true)
 })
+
+test('an effort level with no notches shows as its word, as in the pane', () => {
+  expect(bar({ live: { ...live, effort: '7' }, settings: { ...DEFAULT_SETTINGS, cardLines: ['model'] } })).toBe('Opus 5.5 7')
+})

@@ -20,8 +20,10 @@ const width = (parts: Part[]) => parts.reduce((a, p) => a + cellWidth(p.text), 0
 const model = (live: Live): Part[] | null => {
   if (!live.model) return null
   const parts: Part[] = [{ text: prettyModel(live.model), color: 'claude', bold: true }]
-  const n = live.effort ? EFFORTS.indexOf(live.effort) + 1 : 0
-  if (n > 0) parts.push({ text: ` ${'▮'.repeat(n)}${'▯'.repeat(EFFORTS.length - n)}`, color: 'claude' })
+  if (!live.effort) return parts
+  const n = EFFORTS.indexOf(live.effort) + 1
+  // A level the notches don't know (a number) as its word, as the pane shows it.
+  parts.push({ text: n > 0 ? ` ${'▮'.repeat(n)}${'▯'.repeat(EFFORTS.length - n)}` : ` ${live.effort}`, color: 'claude' })
   return parts
 }
 
