@@ -42,7 +42,11 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
   on('session.cwd', () => ({ value: '/work/x' }))
   on('session.repo', () => ({ value: fake.repo && { ...fake.repo, internal: false, name: null } }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', (_$, e) => (fake.commands.push(e.name), fake.commandSpecs.push(e), { value: { command: e.name } }))
+  on('command.register', (_$, e) => {
+    fake.commands.push(e.name)
+    fake.commandSpecs.push(e)
+    return { value: { command: e.name } }
+  })
   on('session.usage', (_$, e) => {
     fake.usageCalls.push(e)
     if (fake.usageFailures > 0) {
@@ -58,7 +62,11 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     if (e.focus) fake.hiddenPanes.delete(e.id)
     return { value: { isPlaced: true } }
   })
-  on('ui.close', (_$, e) => (fake.openPanes.delete(e.id), fake.hiddenPanes.delete(e.id), { value: undefined }))
+  on('ui.close', (_$, e) => {
+    fake.openPanes.delete(e.id)
+    fake.hiddenPanes.delete(e.id)
+    return { value: undefined }
+  })
   on('ui.panes', () => ({
     value: [...fake.openPanes].map(id => ({ id, title: id, isShown: !fake.hiddenPanes.has(id), isFocused: false, isPlaced: true })) as never,
   }))

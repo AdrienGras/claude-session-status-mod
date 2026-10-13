@@ -50,7 +50,7 @@ export const computeBurn = (usedPct: number, resetsAtMs: number, durationMs: num
  * is the old window's until a reply brings the new one); null for a plain gauge (no length or reset).
  */
 export const readQuota = (r: RateLimit, nowMs: number): Burn | 'stale' | null => {
-  const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
+  const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : Number.NaN
   if (Number.isFinite(resetsAt) && nowMs >= resetsAt) return 'stale'
   const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
   return duration ? computeBurn(r.percentUsed, resetsAt, duration, nowMs) : null

@@ -54,7 +54,7 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
   return async ($: GitDeps, startedAt: number): Promise<GitSnapshot> => {
     const now = await $.clock.now()
     // The session files are measured against startedAt: a new conversation is a new reading.
-    if (cached && cached.startedAt === startedAt && now - cached.at < ttlMs) return cached.snap
+    if (cached?.startedAt === startedAt && now - cached.at < ttlMs) return cached.snap
     const cwd = await $.session.cwd()
     const info = await $.session.repo()
     const snap: GitSnapshot = {

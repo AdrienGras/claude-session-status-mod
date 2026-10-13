@@ -5,7 +5,7 @@ export const CARD_LINES: readonly CardLine[] = ['model', 'context', 'five_hour',
 
 export const DEFAULT_SETTINGS: Settings = { cardLines: ['model', 'context', 'five_hour'], barWidth: 10, hintLayout: 'inline' }
 
-const HINT_LAYOUTS: readonly HintLayout[] = ['inline', 'below']
+const HINT_LAYOUTS: ReadonlySet<string> = new Set<HintLayout>(['inline', 'below'])
 
 const MIN_WIDTH = 6
 const MAX_WIDTH = 24
@@ -19,7 +19,7 @@ export const normalizeSettings = (raw: unknown): Settings => {
     ? r.cardLines.filter((l, i, all): l is CardLine => CARD_LINES.includes(l as CardLine) && all.indexOf(l) === i)
     : [...DEFAULT_SETTINGS.cardLines]
   const width = typeof r.barWidth === 'number' && Number.isFinite(r.barWidth) ? Math.round(r.barWidth) : DEFAULT_SETTINGS.barWidth
-  const hintLayout = HINT_LAYOUTS.includes(r.hintLayout as HintLayout) ? (r.hintLayout as HintLayout) : DEFAULT_SETTINGS.hintLayout
+  const hintLayout = typeof r.hintLayout === 'string' && HINT_LAYOUTS.has(r.hintLayout) ? (r.hintLayout as HintLayout) : DEFAULT_SETTINGS.hintLayout
   return { cardLines, barWidth: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width)), hintLayout }
 }
 

@@ -130,9 +130,9 @@ const header = ({ usage, live }: PaneInput): Section => {
   const state: Part = live.isWorking ? { text: `● ${S.working}`, color: 'claude' } : dim(`○ ${S.idle}`)
   const facts = [live.permissionMode ? `${S.mode} ${live.permissionMode}` : null, `${live.requests} ${S.req}`].filter(Boolean).join(' · ')
   rows.push({ left: live.effort ? effortGauge(live.effort) : [], right: [dim(facts)] })
-  const speed = live.speed
-    ? `${S.ttft} ${(live.speed.ttftMs / 1000).toFixed(1)}s${live.speed.tokPerS === null ? '' : ` · ${Math.round(live.speed.tokPerS)} ${S.tokPerS}`}`
-    : ''
+  const speedParts = live.speed ? [`${S.ttft} ${(live.speed.ttftMs / 1000).toFixed(1)}s`] : []
+  if (typeof live.speed?.tokPerS === 'number') speedParts.push(`${Math.round(live.speed.tokPerS)} ${S.tokPerS}`)
+  const speed = speedParts.join(' · ')
   if (speed || usage) rows.push({ left: [dim(speed)], right: usage ? [dim(`${S.window} ${fmtTokens(usage.window)}`)] : [] })
   const title: Part = { text: live.model ? prettyModel(live.model) : S.model, color: 'claude', bold: true }
   return { title: [title], aside: [state], rows, groups: [] }

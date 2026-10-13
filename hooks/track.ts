@@ -233,9 +233,10 @@ export const registerTracking = (on: On): void => {
   on('agent.spawn', async ($, e, next) => {
     const r = await next(e)
     // A refused spawn starts nothing.
-    if (r.deny !== undefined) return r
-    await update($, countersAtom, c => ({ ...c, subagents: c.subagents + 1 }))
-    await update($, receiptAtom, rc => (rc?.isRunning ? { ...rc, agents: rc.agents + 1 } : rc))
+    if (r.deny === undefined) {
+      await update($, countersAtom, c => ({ ...c, subagents: c.subagents + 1 }))
+      await update($, receiptAtom, rc => (rc?.isRunning ? { ...rc, agents: rc.agents + 1 } : rc))
+    }
     return r
   })
 }
