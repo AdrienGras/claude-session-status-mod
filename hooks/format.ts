@@ -1,0 +1,34 @@
+// Compact figures for narrow cells: durations, token counts, dollars, clock time.
+
+/** `<1m`, `42m`, `1h`, `4h36`, `3d3h`, `2d`, `∞`; negative reads as `<1m`. */
+export const fmtDur = (ms: number): string => {
+  if (ms === Infinity) return '∞'
+  const s = Math.floor(Math.max(0, ms) / 1000)
+  if (s < 60) return '<1m'
+  const minutes = Math.round(s / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const mins = minutes % 60
+  if (hours < 24) return mins ? `${hours}h${String(mins).padStart(2, '0')}` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  const hrs = hours % 24
+  return hrs ? `${days}d${hrs}h` : `${days}d`
+}
+
+/** `140k`, `1M`, `1.5M`. */
+export const fmtTokens = (n: number): string => {
+  if (n >= 1_000_000) {
+    const m = Math.round(n / 100_000) / 10
+    return `${m}M`
+  }
+  return `${Math.round(n / 1000)}k`
+}
+
+/** `$4.82` below a hundred, `$104` above. */
+export const fmtUsd = (usd: number): string => (usd >= 100 ? `$${Math.round(usd)}` : `$${usd.toFixed(2)}`)
+
+/** Local `HH:MM`. */
+export const fmtClock = (epochMs: number): string => {
+  const d = new Date(epochMs)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
