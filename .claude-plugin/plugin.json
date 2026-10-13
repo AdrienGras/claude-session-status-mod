@@ -1,6 +1,6 @@
 {
   "name": "session-status",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "A native Claude Code status line and side pane: model, effort, context, quotas with burn-rate projection, cost and repo.",
   "author": {
     "name": "AdrienGras",
