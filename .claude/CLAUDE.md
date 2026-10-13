@@ -63,6 +63,14 @@ Pure logic goes in `*.ts` with unit tests; `*.tsx` only draws.
 - `/sst debug` is a whitelist (`debug.ts`): figures and categories only, nothing local (no path, MCP server, skill, agent, repo, branch). It ends up in public issues.
 - Never write to the user's settings; the mod's settings live in `$.store`.
 
+## Git workflow
+
+- **Never commit or push to `main` directly.** `main` is protected: every change goes through a branch (`feat/…`, `fix/…`, `docs/…`, `chore/…`) and a pull request, merged only once CI is green.
+- **Before opening a PR**, run the full check above locally (`validate --strict`, `tsc`, `test`) and make sure it passes. CI doesn't run `tsc`, so a type error only shows up locally. If `.github/workflows/` changed, run it with `act` first.
+- **Every user-visible change** gets a line under *Unreleased* in `CHANGELOG.md`, in the same PR (Added / Changed / Fixed / Removed).
+- Conventional Commits (`feat:`, `fix:`, `docs:`, `ci:`, `chore:`…), one topic per commit; the PR body says `Closes #N` and fills the template's checklist.
+- Keep the issue and Project #4 in step with the PR: comment with the commits, move the status, let the merge close it.
+
 ## Release
 
-Move the *Unreleased* entries of `CHANGELOG.md` under the new version, bump `version` in `.claude-plugin/plugin.json` (and the Claude Code version in the README badge and `ci.yml` if it changes), merge to `main`, tag `vX.Y.Z`, push. `release.yml` checks the tag matches `plugin.json` and publishes the GitHub release from the changelog section. Users update with `/plugin` → update, then `/reload-plugins`. Demo GIF: `docs/media/record.sh` (asciinema + agg), trim with `SELECT=event:a..event:b docs/media/record.sh --convert`.
+Every version bump is a **GitHub release**, never just a pushed commit. On a `release/vX.Y.Z` branch: move the *Unreleased* entries of `CHANGELOG.md` under `## [X.Y.Z] - date` (and update the compare links at the bottom), bump `version` in `.claude-plugin/plugin.json` (and the Claude Code version in the README badge and `ci.yml` if it changes). PR, green CI, merge. Then tag the merge commit on `main` `vX.Y.Z` and push the tag: `release.yml` reruns the checks, refuses a tag that doesn't match `plugin.json` or has no changelog section, and publishes the release from it. Semver: `fix` → patch, `feat` → minor, a change that breaks stored settings → major (or a migration in `settings.ts`). Users update with `/plugin` → update, then `/reload-plugins`. Demo GIF: `docs/media/record.sh` (asciinema + agg), trim with `SELECT=event:a..event:b docs/media/record.sh --convert`.
