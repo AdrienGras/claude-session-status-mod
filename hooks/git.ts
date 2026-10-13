@@ -47,13 +47,14 @@ const TTL_MS = 5_000
 /** Dirty paths looked at for the session's own files: a huge worktree is not walked whole. */
 const MAX_STATS = 200
 
-/** A reader that runs `git` at most once per TTL; the snapshot in between is the cached one. */
+/** A reader that runs `git` at most once per TTL and conversation; the snapshot in between is the cached one. */
 export const makeGitReader = (ttlMs = TTL_MS) => {
-  let cached: { at: number; snap: GitSnapshot } | null = null
+  let cached: { at: number; startedAt: number; snap: GitSnapshot } | null = null
 
   return async ($: GitDeps, startedAt: number): Promise<GitSnapshot> => {
     const now = await $.clock.now()
-    if (cached && now - cached.at < ttlMs) return cached.snap
+    // The session files are measured against startedAt: a new conversation is a new reading.
+    if (cached && cached.startedAt === startedAt && now - cached.at < ttlMs) return cached.snap
     const cwd = await $.session.cwd()
     const info = await $.session.repo()
     const snap: GitSnapshot = {
@@ -105,7 +106,7 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
       )
       snap.sessionFiles = paths.filter((_, i) => fresh[i])
     }
-    cached = { at: now, snap }
+    cached = { at: now, startedAt, snap }
     return snap
   }
 }

@@ -62,13 +62,17 @@ const refreshUsage = async ($: Dollar) => {
     breakdownDetail: 'summary',
   }
   await update($, usageAtom, () => view)
-  if (before && before.startedAt !== u.startedAt) {
-    if (!isCountReset) {
+  // Counts older than the conversation: started over by /clear already (their `since` is the hook's
+  // clock, a little before the engine's stamp), rebased onto it; or a conversation the mod did not
+  // see start, counted afresh. Read from the counters themselves, so a second refresh is a no-op.
+  if ((await read($, countersAtom)).since < u.startedAt) {
+    if (isCountReset) await update($, countersAtom, c => ({ ...c, since: u.startedAt }))
+    else {
       await update($, countersAtom, () => emptyCounters(u.startedAt))
       await update($, receiptAtom, () => null)
     }
-    isCountReset = false
   }
+  if (before && before.startedAt !== u.startedAt) isCountReset = false
   return view
 }
 
@@ -99,9 +103,8 @@ export const registerTracking = (on: On): void => {
     await update($, liveAtom, l => ({ ...l, model: l.model ?? model }))
     const stored = await $.store.get(SETTINGS_KEY)
     await update($, settingsAtom, () => normalizeSettings(stored))
-    const view = await refreshUsage($)
     // A fresh process starts counting; a reloaded module keeps the counts of this session.
-    await update($, countersAtom, c => (c.since < view.startedAt ? emptyCounters(view.startedAt) : c))
+    await refreshUsage($)
     redraw?.cancel()
     redraw = $.clock.every(REDRAW_MS, () => $.ui.invalidate('ui.render'))
     refreshLater($)
@@ -119,8 +122,12 @@ export const registerTracking = (on: On): void => {
     await update($, liveAtom, l => ({ ...l, requests: 0, speed: null, isWorking: false }))
     // The old conversation's fill and cost no longer hold; the next figures bring the new ones.
     await update($, usageAtom, u => u && { ...u, tokens: undefined, costUsd: undefined, prompts: 0, breakdown: null })
+    // The old conversation's files are not this one's.
+    await update($, gitAtom, g => g && { ...g, sessionFiles: [] })
     const stored = await $.store.get(SETTINGS_KEY)
     await update($, settingsAtom, () => normalizeSettings(stored))
+    // No measure follows a /clear: read the new conversation's figures and git once the engine has it.
+    refreshLater($)
     return r
   })
 

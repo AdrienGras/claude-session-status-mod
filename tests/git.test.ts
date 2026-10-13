@@ -145,3 +145,15 @@ test('a clean tree reads as a known zero', async () => {
   const snap = await makeGitReader()(d, 0)
   expect([snap.files, snap.added, snap.removed]).toEqual([0, 0, 0])
 })
+
+test('a new conversation reads again within the TTL', async () => {
+  let runs = 0
+  const d = deps({ root: '/work/x', remote: null }, {})
+  const run = d.process.run
+  d.process.run = async (argv, init) => ((runs += 1), run(argv, init))
+  const read = makeGitReader(5_000)
+  await read(d, 0)
+  const first = runs
+  await read(d, 1)
+  expect(runs > first).toBe(true)
+})

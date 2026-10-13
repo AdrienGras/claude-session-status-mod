@@ -96,3 +96,35 @@ test('the drawings are refreshed while nothing else moves', async ($, on) => {
   await fake.clock.advance(60_000)
   expect(redraws >= 2).toBe(true)
 })
+
+test('counts made after /clear survive a later module start (a reload)', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  await startSession($)
+  await fake.clock.set(1_000)
+  await $.session.end({ reason: 'clear', sessionId: 's' } as never)
+  // The engine stamps the new conversation after the session.end chain.
+  fake.usage = { ...fake.usage, startedAt: 1_001 }
+  await $.tool.call({ tool: 'Read', input: {}, tool_use_id: 'u1' } as never)
+  await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  await startSession($)
+  expect((await modState($)).counters.tools).toEqual({ Read: 1 })
+})
+
+test('/clear re-reads the figures and git for the new conversation', async ($, on) => {
+  const fake = fakeEngine(on)
+  fake.repo = { root: '/work/x', remote: null }
+  engineTurns(on)
+  const runs: string[] = []
+  on('process.run', (_$, e) => (runs.push(e.argv.join(' ')), { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  await startSession($)
+  await fake.clock.settle()
+  const calls = fake.usageCalls.length
+  runs.length = 0
+  await $.session.end({ reason: 'clear', sessionId: 's' } as never)
+  fake.usage = { ...fake.usage, startedAt: 1 }
+  await fake.clock.settle()
+  expect(fake.usageCalls.length > calls).toBe(true)
+  // Within the git cache's TTL, but for a new conversation: read again.
+  expect(runs.some(r => r.includes('status'))).toBe(true)
+})
