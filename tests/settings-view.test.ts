@@ -49,3 +49,12 @@ test('the layout switch is kept', async ($, on) => {
   expect(await ui.find({ text: /own row/ })).toBeDefined()
   await ui.unmount()
 })
+
+test('two presses at once both land', async ($, on) => {
+  fakeEngine(on)
+  await startSession($)
+  const ui = await $.ui.mount(configTarget())
+  await Promise.all([ui.press({ key: 'wider' }), ui.press({ key: 'wider' })])
+  expect((await modState($)).settings.barWidth).toBe(12)
+  await ui.unmount()
+})

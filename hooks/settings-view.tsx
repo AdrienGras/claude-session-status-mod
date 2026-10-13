@@ -25,11 +25,11 @@ export const registerSettingsView = (on: On): void => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const current = normalizeSettings(await read($, settingsAtom))
 
-    // Kept at once, and drawn at once: the card reads the same atom.
+    // Drawn at once (the status line reads the same atom) and kept. The change goes to `update`
+    // itself, so two presses before a redraw both land; the store gets the latest settings.
     const change = async (fn: (s: Settings) => Settings) => {
-      const next = fn(normalizeSettings(await read($, settingsAtom)))
-      await $.store.set(SETTINGS_KEY, next)
-      await update($, settingsAtom, () => next)
+      await update($, settingsAtom, s => fn(normalizeSettings(s)))
+      await $.store.set(SETTINGS_KEY, normalizeSettings(await read($, settingsAtom)))
     }
 
     return (
