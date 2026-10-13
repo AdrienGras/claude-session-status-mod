@@ -195,13 +195,16 @@ export const registerTracking = (on: On): void => {
     const isError = 'deny' in r ? true : r.isError === true
     await update($, countersAtom, c => ({ ...c, tools: { ...c.tools, [e.tool]: (c.tools[e.tool] ?? 0) + 1 } }))
     await update($, receiptAtom, rc =>
-      rc?.isRunning ? { ...rc, edits: rc.edits + (EDIT_TOOLS.has(e.tool) ? 1 : 0), errors: rc.errors + (isError ? 1 : 0) } : rc,
+      // A denied or failed edit changed no file: an error, not an edit.
+      rc?.isRunning ? { ...rc, edits: rc.edits + (EDIT_TOOLS.has(e.tool) && !isError ? 1 : 0), errors: rc.errors + (isError ? 1 : 0) } : rc,
     )
     return r
   })
 
   on('agent.spawn', async ($, e, next) => {
     const r = await next(e)
+    // A refused spawn starts nothing.
+    if (r.deny !== undefined) return r
     await update($, countersAtom, c => ({ ...c, subagents: c.subagents + 1 }))
     await update($, receiptAtom, rc => (rc?.isRunning ? { ...rc, agents: rc.agents + 1 } : rc))
     return r

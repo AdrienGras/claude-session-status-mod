@@ -49,3 +49,30 @@ test('/sst runs at once, even while a turn is running', async ($, on) => {
   await startSession($)
   expect(fake.commandSpecs.find(c => c.name === 'sst')?.immediate).toBe(true)
 })
+
+test('a refused spawn starts no subagent', async ($, on) => {
+  fakeEngine(on)
+  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
+  on('agent.spawn', () => ({ deny: 'not now' }) as never)
+  await startSession($)
+  await $.turn.start({ text: 'go', turnId: 'T1' })
+  await $.agent.spawn({ prompt: 'x', agentType: 'general-purpose' } as never)
+  const mod = await modState($)
+  expect(mod.counters.subagents).toBe(0)
+  expect(mod.receipt?.agents).toBe(0)
+})
+
+test('a denied or failed edit is an error, not an edit', async ($, on) => {
+  fakeEngine(on)
+  on('turn.start', (_$, e) => ({ turnId: e.turnId }))
+  let answer: unknown = { deny: 'declined' }
+  on('tool.call', () => answer as never)
+  await startSession($)
+  await $.turn.start({ text: 'go', turnId: 'T1' })
+  await $.tool.call({ tool: 'Edit', input: {}, tool_use_id: 'u1' } as never)
+  answer = { result: 'String to replace not found', isError: true }
+  await $.tool.call({ tool: 'Edit', input: {}, tool_use_id: 'u2' } as never)
+  const mod = await modState($)
+  expect(mod.receipt?.edits).toBe(0)
+  expect(mod.receipt?.errors).toBe(2)
+})
