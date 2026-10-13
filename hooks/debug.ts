@@ -6,6 +6,12 @@ import type { Counters, GitSnapshot, Live, Receipt, Settings } from '../types'
 
 type ModState = { live: Live; counters: Counters; receipt: Receipt | null; git: GitSnapshot | null; settings: Settings }
 
+/**
+ * The Claude model name inside a model id, or `other`: a configured id can be a cloud ARN or a
+ * gateway's alias, with an account id or a host in it.
+ */
+const modelName = (id: string | null) => (id === null ? null : (id.match(/claude-[a-z0-9.-]*[a-z0-9]/i)?.[0] ?? 'other'))
+
 /** `mcp__server__tool` names a server: every MCP tool counts as `mcp`. */
 const toolKind = (name: string) => (name.startsWith('mcp__') ? 'mcp' : name)
 
@@ -33,7 +39,7 @@ export const debugReport = (usage: SessionUsage, mod: ModState) => {
       autocompactSource: b?.autocompactSource,
     },
     mod: {
-      live: mod.live,
+      live: { ...mod.live, model: modelName(mod.live.model) },
       counters: { ...mod.counters, tools },
       receipt: mod.receipt,
       git: g && {
