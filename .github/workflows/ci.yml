@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # The mod API is early access: pin the Claude Code release the mod targets (README badge).
+      CLAUDE_CODE_VERSION: 2.1.296
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+      - name: Install Claude Code
+        run: |
+          npm install --global "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          claude --version
+      # No tsc here: the API's type declarations are only laid by a logged-in session.
+      - name: Validate manifests and mod rules
+        run: claude plugin validate --strict .
+      - name: Run tests
+        run: claude plugin test .
