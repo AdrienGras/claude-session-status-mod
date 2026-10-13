@@ -1,5 +1,7 @@
 // A stand-in for the engine beneath the plugin, shared by the integration tests.
 import type { On, SessionUsage } from 'claude-code'
+import { mock } from 'claude-code/testing'
+import type { MockClock } from 'claude-code/testing'
 
 export type FakeEngine = {
   usage: SessionUsage
@@ -7,6 +9,7 @@ export type FakeEngine = {
   turns: number
   openPanes: Set<string>
   commands: string[]
+  clock: MockClock
 }
 
 export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine => {
@@ -21,7 +24,11 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     turns: 0,
     openPanes: new Set(),
     commands: [],
+    clock: mock.clock(on),
   }
+  mock.store(on)
+  on('session.cwd', () => ({ value: '/work/x' }))
+  on('session.repo', () => ({ value: null }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', (_$, e) => (fake.commands.push(e.name), { value: { command: e.name } }))
   on('session.usage', () => ({ value: fake.usage }))
@@ -45,3 +52,13 @@ export const typed = (command: string, args = '') => ({
   origin: { kind: 'user' } as never,
   presentation: { isFullscreen: true, columns: 160 },
 })
+
+/** The mod's own state, as `/sst debug` dumps it. */
+export const modState = async ($: { command: { run: (e: never) => Promise<unknown> } }) => {
+  const out = (await $.command.run(typed('sst', 'debug') as never)) as { text?: string }
+  return JSON.parse(out.text ?? '{}').mod as {
+    live: { model: string | null; effort: string | null; isWorking: boolean; requests: number; speed: unknown }
+    counters: { compactions: number; tools: Record<string, number>; subagents: number }
+    receipt: { edits: number; errors: number; agents: number; isRunning: boolean } | null
+  }
+}

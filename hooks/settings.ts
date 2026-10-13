@@ -7,7 +7,8 @@ export const DEFAULT_SETTINGS: Settings = { cardLines: ['model', 'context', 'fiv
 
 const MIN_WIDTH = 6
 const MAX_WIDTH = 24
-const KEY = 'settings'
+/** The $.store key the settings live under. */
+export const SETTINGS_KEY = 'settings'
 
 /** Anything stored, or nothing, as valid settings: unknown lines dropped, width clamped. */
 export const normalizeSettings = (raw: unknown): Settings => {
@@ -18,10 +19,3 @@ export const normalizeSettings = (raw: unknown): Settings => {
   const width = typeof r.barWidth === 'number' && Number.isFinite(r.barWidth) ? Math.round(r.barWidth) : DEFAULT_SETTINGS.barWidth
   return { cardLines, barWidth: Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width)) }
 }
-
-/** The part of `$` settings use: the engine's, or a test's. */
-export type StoreDeps = { store: { get: (key: string) => Promise<unknown>; set: (key: string, value: unknown) => Promise<void> } }
-
-export const loadSettings = async ($: StoreDeps): Promise<Settings> => normalizeSettings(await $.store.get(KEY))
-
-export const saveSettings = async ($: StoreDeps, s: Settings): Promise<void> => $.store.set(KEY, normalizeSettings(s))
