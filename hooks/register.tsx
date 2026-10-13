@@ -3,7 +3,7 @@ import { atom, read } from 'claude-code'
 
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import type { GitSnapshot, Receipt } from '../types'
-import { registerCard } from './card'
+import { registerMinibar } from './minibar'
 import { PANE_ID, registerPane } from './pane'
 import { CONFIG_PANE_ID, registerSettingsView } from './settings-view'
 import { debugReport } from './debug'
@@ -19,7 +19,7 @@ const settingsAtom = atom({ plugin: 'session-status', key: 'settings' } as const
 
 export const register: Register = on => {
   registerTracking(on)
-  registerCard(on)
+  registerMinibar(on)
   registerPane(on)
   registerSettingsView(on)
 

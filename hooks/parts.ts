@@ -1,14 +1,12 @@
-// What the compact card says, line by line, as coloured parts; drawing is card.tsx's.
+// Coloured parts shared by the status line under the prompt and the side pane.
 import type { Cell } from './bars'
 import { burnBar, lineBar, segmentBar } from './bars'
 import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
 import { contextLabel, toSegments } from './context'
-import { fmtUsd } from './format'
 import { S } from './strings'
-import type { CardLine, GitSnapshot, Live, RateLimit, Settings, UsageView } from '../types'
+import type { RateLimit, UsageView } from '../types'
 
 export type Part = { text: string; color?: string; bold?: boolean; dim?: boolean }
-export type Row = { key: CardLine; parts: Part[] }
 
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 
@@ -63,35 +61,4 @@ export const contextParts = (usage: UsageView, width: number): Part[] => {
       ? segmentBar(toSegments(usage.breakdown, usage.tokens, usage.window), usage.window, width)
       : lineBar(label.pct === null ? 0 : label.pct / 100, width, tone)
   return [{ text: `${S.ctx} `, dim: true }, ...cellsToParts(bar), { text: ` ${label.text}`, color: tone }]
-}
-
-type CardInput = { usage: UsageView | null; live: Live; git: GitSnapshot | null; settings: Settings; now: number }
-
-/** The card's lines in the person's order; a line whose figure is unknown is left out. */
-export const cardRows = ({ usage, live, git, settings, now }: CardInput): Row[] => {
-  const rows: Row[] = []
-  const width = settings.barWidth
-  for (const key of settings.cardLines) {
-    if (key === 'model' && live.model) {
-      const model: Part = { text: prettyModel(live.model), color: 'claude', bold: true }
-      rows.push({ key, parts: live.effort ? [model, { text: '  ' }, ...effortGauge(live.effort)] : [model] })
-    } else if (key === 'context' && usage) {
-      rows.push({ key, parts: contextParts(usage, width) })
-    } else if ((key === 'five_hour' || key === 'seven_day') && usage) {
-      const r = usage.rateLimits.find(l => l.kind === key)
-      if (r) rows.push({ key, parts: quotaParts(r, width, now) })
-    } else if (key === 'cost' && usage?.costUsd !== undefined) {
-      rows.push({ key, parts: [{ text: fmtUsd(usage.costUsd), color: 'warning' }] })
-    } else if (key === 'repo' && git?.branch) {
-      rows.push({
-        key,
-        parts: [
-          { text: ` ${git.branch}`, color: 'ide' },
-          { text: ` +${git.added}`, color: 'diffAdded' },
-          { text: ` −${git.removed}`, color: 'diffRemoved' },
-        ],
-      })
-    }
-  }
-  return rows
 }

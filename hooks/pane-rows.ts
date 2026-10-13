@@ -1,6 +1,6 @@
 // What the side pane says, section by section, as coloured parts; drawing is pane.tsx's.
-import { contextParts, effortGauge, prettyModel, quotaParts } from './card-rows'
-import type { Part } from './card-rows'
+import { contextParts, effortGauge, prettyModel, quotaParts } from './parts'
+import type { Part } from './parts'
 import { compactHeadroom, mcpByServer, toSegments } from './context'
 import { fmtClock, fmtDur, fmtTokens, fmtUsd } from './format'
 import { costRates } from './session'

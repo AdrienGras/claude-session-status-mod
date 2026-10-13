@@ -2,7 +2,7 @@
 import type { On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
-import type { Part } from './card-rows'
+import type { Part } from './parts'
 import { toBreakdownView } from './context'
 import { paneSections } from './pane-rows'
 import { normalizeSettings } from './settings'

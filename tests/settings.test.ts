@@ -2,8 +2,8 @@ import { expect, test } from 'claude-code/testing'
 
 import { DEFAULT_SETTINGS, normalizeSettings } from '../hooks/settings'
 
-test('defaults: model, context and the 5h window, bars 10 wide', () => {
-  expect(DEFAULT_SETTINGS).toEqual({ cardLines: ['model', 'context', 'five_hour'], barWidth: 10 })
+test('defaults: model, context, the 5h window and cost, bars 10 wide', () => {
+  expect(DEFAULT_SETTINGS).toEqual({ cardLines: ['model', 'context', 'five_hour', 'cost'], barWidth: 10 })
   expect(normalizeSettings(undefined)).toEqual(DEFAULT_SETTINGS)
   expect(normalizeSettings('junk')).toEqual(DEFAULT_SETTINGS)
 })
@@ -15,6 +15,9 @@ test('unknown and repeated lines dropped, order kept, width clamped', () => {
 })
 
 import { moveLine, resizeBars, settingsRows, toggleLine } from '../hooks/settings'
+import type { Settings } from '../types'
+
+const BASE: Settings = { cardLines: ['model', 'context', 'five_hour'], barWidth: 10 }
 
 test('the settings list shows lines on, in order, then the lines off', () => {
   const rows = settingsRows({ cardLines: ['five_hour', 'model'], barWidth: 10 })
@@ -29,19 +32,19 @@ test('the settings list shows lines on, in order, then the lines off', () => {
 })
 
 test('toggling a line turns it off, or on at the end', () => {
-  expect(toggleLine(DEFAULT_SETTINGS, 'five_hour').cardLines).toEqual(['model', 'context'])
-  expect(toggleLine(DEFAULT_SETTINGS, 'cost').cardLines).toEqual(['model', 'context', 'five_hour', 'cost'])
+  expect(toggleLine(BASE, 'five_hour').cardLines).toEqual(['model', 'context'])
+  expect(toggleLine(BASE, 'cost').cardLines).toEqual(['model', 'context', 'five_hour', 'cost'])
 })
 
 test('moving a line swaps it with its neighbour, the ends stay put', () => {
-  expect(moveLine(DEFAULT_SETTINGS, 'context', -1).cardLines).toEqual(['context', 'model', 'five_hour'])
-  expect(moveLine(DEFAULT_SETTINGS, 'model', -1).cardLines).toEqual(['model', 'context', 'five_hour'])
-  expect(moveLine(DEFAULT_SETTINGS, 'five_hour', 1).cardLines).toEqual(['model', 'context', 'five_hour'])
-  expect(moveLine(DEFAULT_SETTINGS, 'cost', 1).cardLines).toEqual(['model', 'context', 'five_hour'])
+  expect(moveLine(BASE, 'context', -1).cardLines).toEqual(['context', 'model', 'five_hour'])
+  expect(moveLine(BASE, 'model', -1).cardLines).toEqual(['model', 'context', 'five_hour'])
+  expect(moveLine(BASE, 'five_hour', 1).cardLines).toEqual(['model', 'context', 'five_hour'])
+  expect(moveLine(BASE, 'cost', 1).cardLines).toEqual(['model', 'context', 'five_hour'])
 })
 
 test('bar width steps within 6..24', () => {
-  expect(resizeBars(DEFAULT_SETTINGS, 1).barWidth).toBe(11)
-  expect(resizeBars({ ...DEFAULT_SETTINGS, barWidth: 24 }, 1).barWidth).toBe(24)
-  expect(resizeBars({ ...DEFAULT_SETTINGS, barWidth: 6 }, -1).barWidth).toBe(6)
+  expect(resizeBars(BASE, 1).barWidth).toBe(11)
+  expect(resizeBars({ ...BASE, barWidth: 24 }, 1).barWidth).toBe(24)
+  expect(resizeBars({ ...BASE, barWidth: 6 }, -1).barWidth).toBe(6)
 })

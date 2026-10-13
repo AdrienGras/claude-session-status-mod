@@ -18,16 +18,16 @@ test('the side pane has a way to the settings', async ($, on) => {
   await ui.unmount()
 })
 
-test('turning a line off reaches the card and survives a new session', async ($, on) => {
+test('turning a line off is kept and survives a new session', async ($, on) => {
   fakeEngine(on, { rateLimits: [{ kind: 'five_hour', percentUsed: 20, resetsAt: new Date(9_000_000).toISOString() }] })
   await startSession($)
   const ui = await $.ui.mount(configTarget())
   expect(await ui.find({ text: /\[x\] 5h window/ })).toBeDefined()
   await ui.press({ key: 'line-five_hour' })
-  expect((await modState($)).settings.cardLines).toEqual(['model', 'context'])
+  expect((await modState($)).settings.cardLines).toEqual(['model', 'context', 'cost'])
   await ui.unmount()
   await startSession($)
-  expect((await modState($)).settings.cardLines).toEqual(['model', 'context'])
+  expect((await modState($)).settings.cardLines).toEqual(['model', 'context', 'cost'])
 })
 
 test('bars widen up to 24 and no further', async ($, on) => {

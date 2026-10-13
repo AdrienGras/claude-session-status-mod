@@ -43,7 +43,7 @@ export const S = {
   actionRecount: 'recount',
   paneOpened: 'Session pane opened.',
   paneClosed: 'Session pane closed.',
-  cardLines: 'Card lines',
+  cardLines: 'Status line',
   lineModel: 'Model & effort',
   lineContext: 'Context',
   lineFiveHour: '5h window',
