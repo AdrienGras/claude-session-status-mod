@@ -33,6 +33,7 @@ test('a new session start (/clear) resets what the mod counted', async ($, on) =
   await $.session.compact(compaction)
   fake.usage = { ...fake.usage, startedAt: 5_000 }
   await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  await fake.clock.settle()
   expect((await modState($)).counters.compactions).toBe(0)
 })
 

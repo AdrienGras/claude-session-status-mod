@@ -47,6 +47,7 @@ test('the first turn after /clear keeps its counts when the new figures arrive',
   await $.tool.call({ tool: 'Read', input: {}, tool_use_id: 'u1' } as never)
   fake.usage = { ...fake.usage, startedAt: 1 }
   await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  await fake.clock.settle()
   expect((await modState($)).counters.tools).toEqual({ Read: 1 })
 })
 
@@ -107,6 +108,7 @@ test('counts made after /clear survive a later module start (a reload)', async (
   fake.usage = { ...fake.usage, startedAt: 1_001 }
   await $.tool.call({ tool: 'Read', input: {}, tool_use_id: 'u1' } as never)
   await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  await fake.clock.settle()
   await startSession($)
   expect((await modState($)).counters.tools).toEqual({ Read: 1 })
 })
@@ -138,4 +140,16 @@ test('the redraw is armed even when the first usage read fails', async ($, on) =
   await fake.clock.advance(60_000)
   expect(fake.usageCalls.length >= 2).toBe(true)
   expect(redraws >= 2).toBe(true)
+})
+
+test('a measure is handed back before the figures are re-read', async ($, on) => {
+  const fake = fakeEngine(on)
+  engineTurns(on)
+  await startSession($)
+  await fake.clock.settle()
+  const calls = fake.usageCalls.length
+  await $.session.measure({ ...fake.usage, changed: ['context'] } as never)
+  expect(fake.usageCalls.length).toBe(calls)
+  await fake.clock.settle()
+  expect(fake.usageCalls.length).toBe(calls + 1)
 })

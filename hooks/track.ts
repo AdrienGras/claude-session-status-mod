@@ -134,7 +134,8 @@ export const registerTracking = (on: On): void => {
 
   on('session.measure', async ($, e, next) => {
     const r = await next(e)
-    await refreshUsage($)
+    // After the measure is handed back, as every slow read.
+    $.clock.after(0, () => void refreshUsage($))
     return r
   })
 
