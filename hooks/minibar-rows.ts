@@ -1,9 +1,10 @@
 // The status line under the prompt: the person's items, one line, cut to the room it has.
 import { lineBar, segmentBar, burnBar } from './bars'
 import { computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
-import { contextLabel, toSegments } from './context'
+import { contextFigure, contextLabel, toSegments } from './context'
 import { fmtUsd } from './format'
 import { cellsToParts, prettyModel } from './parts'
+import { S } from './strings'
 import type { Part } from './parts'
 import type { CardLine, GitSnapshot, Live, RateLimit, Settings, UsageView } from '../types'
 
@@ -24,13 +25,14 @@ const model = (live: Live): Part[] | null => {
 }
 
 const context = (usage: UsageView, w: number): Part[] => {
-  const label = contextLabel(usage.tokens, usage.window)
-  const tone = label.pct === null ? 'inactive' : contextTone(label.pct)
-  const bar =
-    usage.breakdown && usage.tokens !== undefined
-      ? segmentBar(toSegments(usage.breakdown, usage.tokens, usage.window), usage.window, w)
-      : lineBar(label.pct === null ? 0 : label.pct / 100, w, tone)
-  return [{ text: 'ctx ', dim: true }, ...cellsToParts(bar), { text: label.pct === null ? ' —' : ` ${label.pct}%`, color: tone }]
+  const figure = contextFigure(usage)
+  const label = contextLabel(figure.tokens, usage.window, figure.isEstimate)
+  if (label.pct === null) return [{ text: `ctx ${S.ctxPending}`, dim: true }]
+  const tone = figure.isEstimate ? 'inactive' : contextTone(label.pct)
+  const bar = usage.breakdown
+    ? segmentBar(toSegments(usage.breakdown, figure.tokens, usage.window), usage.window, w)
+    : lineBar(label.pct / 100, w, tone)
+  return [{ text: 'ctx ', dim: true }, ...cellsToParts(bar), { text: ` ${figure.isEstimate ? '≈' : ''}${label.pct}%`, color: tone }]
 }
 
 /** `5h ━━──┊──── 20% → 40% ✓`: the verdict as its glyph alone; a plain gauge without a reset time. */
@@ -76,4 +78,15 @@ export const minibarParts = (input: MinibarInput, maxCols: number): Part[] => {
     out.push(...next)
   }
   return out
+}
+
+/** Between the engine's hint and the status: never run into it. */
+const LEAD: Part = { text: '  │ ', color: 'subtle' }
+/** Columns kept for the line's padding and the open mark. */
+const RESERVED = 6
+
+/** The status as drawn after a hint `hintWidth` wide on a `columns`-wide row; empty when nothing fits. */
+export const minibarLine = (input: MinibarInput, hintWidth: number, columns: number): Part[] => {
+  const parts = minibarParts(input, columns - hintWidth - RESERVED - width([LEAD]))
+  return parts.length ? [LEAD, ...parts] : []
 }

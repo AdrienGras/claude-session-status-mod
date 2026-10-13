@@ -32,3 +32,15 @@ export const fmtClock = (epochMs: number): string => {
   const d = new Date(epochMs)
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** A moment to come: `23:50` today, `tomorrow 17:00`, then `Oct 15 17:00`. */
+export const fmtWhen = (epochMs: number, nowMs: number): string => {
+  const at = new Date(epochMs)
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const days = Math.round((day(at) - day(new Date(nowMs))) / 86_400_000)
+  if (days <= 0) return fmtClock(epochMs)
+  if (days === 1) return `tomorrow ${fmtClock(epochMs)}`
+  return `${MONTHS[at.getMonth()]} ${at.getDate()} ${fmtClock(epochMs)}`
+}

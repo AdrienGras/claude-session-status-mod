@@ -33,3 +33,12 @@ test('clock time is local HH:MM', () => {
   const at = new Date(2026, 9, 13, 17, 40).getTime()
   expect(fmtClock(at)).toBe('17:40')
 })
+
+import { fmtWhen } from '../hooks/format'
+
+test('a reset reads as a clock time today, tomorrow, or a date beyond', () => {
+  const now = new Date(2026, 9, 13, 19, 48).getTime()
+  expect(fmtWhen(new Date(2026, 9, 13, 23, 50).getTime(), now)).toBe('23:50')
+  expect(fmtWhen(new Date(2026, 9, 14, 17, 0).getTime(), now)).toBe('tomorrow 17:00')
+  expect(fmtWhen(new Date(2026, 9, 15, 17, 0).getTime(), now)).toBe('Oct 15 17:00')
+})

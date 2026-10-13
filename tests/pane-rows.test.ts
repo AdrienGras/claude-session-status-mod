@@ -156,3 +156,19 @@ test('a long repo name moves the diff to a row of its own, uncut', () => {
   expect(t).toContain('AdrienGras/claude-session-status-mod')
   expect(t).toContain('+42 −7 · 3 files · ↑2 ↓0')
 })
+
+test('before the first reply the context box shows the estimate and says so', () => {
+  const t = box(input({ usage: { ...input().usage!, tokens: undefined } }), 'Context ≈')!
+  expect(t.split('\n')[0]).toContain('≈96k/1M 10%')
+  expect(t).toContain('estimate until the first reply')
+})
+
+test('with no figure at all the context box says when it comes', () => {
+  const t = box(input({ usage: { ...input().usage!, tokens: undefined, breakdown: null } }), 'Context')!
+  expect(t).toContain('fills after the first reply')
+})
+
+test('a weekly reset names its day', () => {
+  const t = box(input(), 'Quotas')!
+  expect(t).toMatch(/resets [A-Z][a-z]{2} \d{1,2} \d\d:\d\d/)
+})

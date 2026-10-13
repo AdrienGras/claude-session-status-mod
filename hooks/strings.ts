@@ -6,7 +6,7 @@ export const S = {
   effort: 'effort',
   ctx: 'ctx',
   paneTitle: 'Session',
-  openPane: '▸',
+  openPane: '◨',
   model: 'Model',
   context: 'Context',
   quotas: 'Quotas',
@@ -59,4 +59,7 @@ export const S = {
   memory: 'memory',
   skills: 'skills',
   agents: 'agents',
+  ctxPending: 'after 1st reply',
+  ctxEstimate: 'estimate until the first reply',
+  ctxFillsLater: 'fills after the first reply',
 } as const

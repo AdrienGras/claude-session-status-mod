@@ -21,15 +21,15 @@ Answer `y` to add the marketplace, then pick a scope (user scope loads it in eve
 One line under the prompt, where Claude Code draws its hint (`? for shortcuts`), which stays at the left. By default:
 
 ```
-? for shortcuts      Opus 5.5 ▮▮▮▯▯ │ ctx ━───────── 4% │ 5h ╸┊──────── 7% → 49% ✓ │ $0.17 ▸
+? for shortcuts  │ Opus 5.5 ▮▮▮▯▯ │ ctx ━───────── 4% │ 5h ╸┊──────── 7% → 49% ✓ │ $0.17 ◨
 ```
 
 - **Model and effort**: the effort as five notches
-- **Context**: a bar coloured by category, the same colours `/context` uses, and the share of the window
+- **Context**: a bar coloured by category, the same colours `/context` uses, and the share of the window. Before the first reply it shows Claude Code's own estimate, marked `≈`
 - **5h window**: a bar of what you used, a `┊` mark where you would be at an even pace, then used, the projection at reset and a verdict: `✓` time to spare, `⚠` you hit 100% before the reset at this pace
 - **Cost** of the session
 
-Items that do not fit the terminal are dropped from the right. `▸` opens the side pane. `/sst config` chooses the items and their order.
+Items that do not fit the terminal are dropped from the right. `◨` opens the side pane. `/sst config` chooses the items and their order.
 
 ### The side pane
 

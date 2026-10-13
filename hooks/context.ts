@@ -25,11 +25,22 @@ export const toSegments = (breakdown: Pick<BreakdownView, 'categories'>, tokens:
   return segments
 }
 
-/** `140k/1M 14%`; a dash before the first reading. */
-export const contextLabel = (tokens: number | undefined, window: number): { text: string; pct: number | null } => {
+/** `140k/1M 14%`, `≈22k/1M 2%` for an estimate; a dash with no figure at all. */
+export const contextLabel = (tokens: number | undefined, window: number, isEstimate = false): { text: string; pct: number | null } => {
   if (tokens === undefined || window <= 0) return { text: '—', pct: null }
   const pct = Math.round((tokens / window) * 100)
-  return { text: `${fmtTokens(tokens)}/${fmtTokens(window)} ${pct}%`, pct }
+  return { text: `${isEstimate ? '≈' : ''}${fmtTokens(tokens)}/${fmtTokens(window)} ${pct}%`, pct }
+}
+
+/**
+ * The fill to show: the real one once a reply has measured it; before that, the breakdown's own
+ * estimate of what the window holds (its used categories), marked as such; else nothing.
+ */
+export const contextFigure = (usage: { tokens?: number; breakdown: Pick<BreakdownView, 'categories'> | null }): { tokens?: number; isEstimate: boolean } => {
+  if (usage.tokens !== undefined) return { tokens: usage.tokens, isEstimate: false }
+  if (!usage.breakdown) return { isEstimate: false }
+  const used = usage.breakdown.categories.filter(c => c.kind === 'used').reduce((a, c) => a + c.tokens, 0)
+  return used > 0 ? { tokens: used, isEstimate: true } : { isEstimate: false }
 }
 
 export const mcpByServer = (tools: readonly { serverName: string; tokens: number }[]): { server: string; tokens: number; count: number }[] => {

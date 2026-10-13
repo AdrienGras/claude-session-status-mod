@@ -2,8 +2,8 @@
 // pane.tsx only draws these rows and wires the buttons.
 import { burnBar, lineBar, segmentBar } from './bars'
 import { burnVerdict, computeBurn, contextTone, projectionText, projectionTone, WINDOW_MS } from './burn'
-import { compactHeadroom, contextLabel, mcpByServer, toSegments } from './context'
-import { fmtClock, fmtDur, fmtTokens, fmtUsd } from './format'
+import { compactHeadroom, contextFigure, contextLabel, mcpByServer, toSegments } from './context'
+import { fmtDur, fmtTokens, fmtUsd, fmtWhen } from './format'
 import { cellsToParts, effortGauge, prettyModel } from './parts'
 import type { Part } from './parts'
 import { costRates } from './session'
@@ -139,20 +139,23 @@ const header = ({ usage, live }: PaneInput): Section => {
 
 const context = (usage: UsageView, columns: number): Section => {
   const b = usage.breakdown
-  const label = contextLabel(usage.tokens, usage.window)
-  const tone = label.pct === null ? 'inactive' : contextTone(label.pct)
+  const figure = contextFigure(usage)
+  const label = contextLabel(figure.tokens, usage.window, figure.isEstimate)
+  const tone = label.pct === null || figure.isEstimate ? 'inactive' : contextTone(label.pct)
   const inner = columns - FRAME
   const rows: Row[] = []
   const groups: Group[] = []
-  if (b && usage.tokens !== undefined) {
-    const segments = toSegments(b, usage.tokens, usage.window)
+  if (label.pct === null) rows.push({ left: [dim(S.ctxFillsLater)] })
+  else if (figure.isEstimate) rows.push({ left: [dim(S.ctxEstimate)] })
+  if (b && figure.tokens !== undefined) {
+    const segments = toSegments(b, figure.tokens, usage.window)
     rows.push({ left: cellsToParts(segmentBar(segments, usage.window, inner)) })
     const used = segments.filter(s => s.kind === 'used' && Math.round(s.tokens) > 0).sort((x, y) => y.tokens - x.tokens)
     for (const s of used.slice(0, LEGEND_SIZE)) rows.push({ left: [{ text: '■ ', color: s.color }, { text: s.label }], right: [dim(fmtTokens(s.tokens))] })
     const rest = used.slice(LEGEND_SIZE).reduce((a, s) => a + s.tokens, 0)
     if (rest > 0) rows.push({ left: [dim(`■ ${S.other}`)], right: [dim(fmtTokens(rest))] })
-  } else {
-    rows.push({ left: cellsToParts(lineBar(label.pct === null ? 0 : label.pct / 100, inner, tone)) })
+  } else if (label.pct !== null) {
+    rows.push({ left: cellsToParts(lineBar(label.pct / 100, inner, tone)) })
   }
   if (b) {
     if (!b.isAutoCompactEnabled) rows.push({ left: [dim(S.autoCompactOff)] })
@@ -180,6 +183,7 @@ const context = (usage: UsageView, columns: number): Section => {
 }
 
 const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
+  const when = (at: number) => `${S.resets} ${fmtWhen(at, now)}`
   const label = dim(`${r.kind === 'five_hour' ? '5h' : r.kind === 'seven_day' ? '7d' : r.kind} `)
   const duration = WINDOW_MS[r.kind as keyof typeof WINDOW_MS]
   const resetsAt = r.resetsAt ? Date.parse(r.resetsAt) : NaN
@@ -189,7 +193,7 @@ const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
     const rows: Row[] = [
       { left: [label, ...cellsToParts(lineBar(r.percentUsed / 100, width, tone))], right: [{ text: `${Math.round(r.percentUsed)}%`, color: tone }] },
     ]
-    if (Number.isFinite(resetsAt)) rows.push({ left: [dim(`   ${S.resets} ${fmtClock(resetsAt)}`)] })
+    if (Number.isFinite(resetsAt)) rows.push({ left: [dim(`   ${when(resetsAt)}`)] })
     return rows
   }
   return [
@@ -197,7 +201,7 @@ const quotaRows = (r: RateLimit, width: number, now: number): Row[] => {
       left: [label, ...cellsToParts(burnBar(burn, width)), dim(` ${Math.round(r.percentUsed)}%`)],
       right: [{ text: `${projectionText(burn)} ${burnVerdict(burn)}`, color: projectionTone(burn) }],
     },
-    { left: [dim(`   ⧗${fmtDur(burn.remainingMs)} · ${S.resets} ${fmtClock(resetsAt)}`)] },
+    { left: [dim(`   ⧗${fmtDur(burn.remainingMs)} · ${when(resetsAt)}`)] },
   ]
 }
 

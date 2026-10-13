@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { minibarParts } from '../hooks/minibar-rows'
+import { minibarLine, minibarParts } from '../hooks/minibar-rows'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE } from '../hooks/state'
 import type { UsageView } from '../types'
@@ -35,11 +35,27 @@ test('no rate limits: no quota item', () => {
   expect(bar({ usage: { ...usage, rateLimits: [] } })).not.toContain('5h')
 })
 
-test('before the first reading the context is a dash, never 0%', () => {
-  const t = bar({ usage: { ...usage, tokens: undefined } })
+test('before the first reply the context is the estimate, marked', () => {
+  const breakdown = {
+    categories: [{ name: 'System prompt', tokens: 20_000, color: 'promptBorder', kind: 'used' as const }],
+    memoryFiles: [], mcpTools: [], agents: [], isAutoCompactEnabled: true, autocompactSource: 'model-default',
+  }
+  const t = bar({ usage: { ...usage, tokens: undefined, breakdown } })
   expect(t).toContain('ctx ')
-  expect(t).toContain('—')
+  expect(t).toContain(' ≈2%')
+})
+
+test('with no figure at all the context says when it comes, never 0%', () => {
+  const t = bar({ usage: { ...usage, tokens: undefined } })
+  expect(t).toContain('ctx after 1st reply')
   expect(t).not.toContain(' 0%')
+})
+
+test('the line starts with a separator, so it never runs into the hint', () => {
+  const line = minibarLine({ usage, live, git: null, settings: DEFAULT_SETTINGS, now: NOW }, 50, 200)
+  expect(text(line).startsWith('  │ Opus 5.5')).toBe(true)
+  expect([...text(minibarLine({ usage, live, git: null, settings: DEFAULT_SETTINGS, now: NOW }, 50, 100))].length <= 100 - 50 - 6).toBe(true)
+  expect(minibarLine({ usage, live, git: null, settings: DEFAULT_SETTINGS, now: NOW }, 95, 100)).toEqual([])
 })
 
 test('a pace that hits the wall says so', () => {

@@ -54,6 +54,7 @@ test('the open mark opens the side pane', async ($, on) => {
   beneath(on)
   await startSession($)
   const ui = await $.ui.mount(hint())
+  expect((await ui.find({ key: 'open' }))?.props.label).toBe('◨')
   await ui.press({ key: 'open' })
   expect(fake.openPanes.has('sst')).toBe(true)
   await ui.unmount()
