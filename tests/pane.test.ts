@@ -32,18 +32,27 @@ test('a full count runs on the recount button only', async ($, on) => {
   await ui.unmount()
 })
 
-test('compact asks first, then runs /compact', async ($, on) => {
+test('compact asks first, then runs /compact; cancelled or dismissed, nothing runs', async ($, on) => {
   fakeEngine(on)
   const ran: string[] = []
+  let answer: string | null = 'Compact'
   on('tool.call', { tool: 'AskUserQuestion' }, (_$, e) => {
+    ran.push('ask')
     const question = String(e.questions[0]?.question)
-    return { result: { questions: [], answers: { [question]: 'Compact' } } } as never
+    if (answer === null) throw new Error('dismissed')
+    return { result: { questions: [], answers: { [question]: answer } } } as never
   })
   on('command.run', { command: 'compact' }, (_$, e) => (ran.push(e.command), { text: '' }))
   await startSession($)
   const ui = await $.ui.mount(paneTarget())
   await ui.press({ key: 'compact' })
-  expect(ran).toEqual(['compact'])
+  expect(ran).toEqual(['ask', 'compact'])
+  ran.length = 0
+  answer = 'Cancel'
+  await ui.press({ key: 'compact' })
+  answer = null
+  await ui.press({ key: 'compact' })
+  expect(ran).toEqual(['ask', 'ask'])
   await ui.unmount()
 })
 
