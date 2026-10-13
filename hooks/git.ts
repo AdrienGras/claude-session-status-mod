@@ -19,16 +19,21 @@ export const parseAheadBehind = (out: string): { ahead: number; behind: number }
   return m ? { behind: Number(m[1]), ahead: Number(m[2]) } : null
 }
 
-/** Paths from `git status --porcelain`; a rename reads as its destination. */
-export const parsePorcelain = (out: string): string[] =>
-  out
-    .split('\n')
-    .filter(line => line.length > 3)
-    .map(line => {
-      const path = line.slice(3)
-      const dest = path.includes(' -> ') ? path.split(' -> ').pop()! : path
-      return dest.replace(/^"(.*)"$/, '$1')
-    })
+/**
+ * Paths from `git status --porcelain -z`, as written (no C-quoting under -z): `XY path`, NUL
+ * ended; a rename or copy is followed by its source, a field of its own, skipped.
+ */
+export const parsePorcelain = (out: string): string[] => {
+  const fields = out.split('\0')
+  const paths: string[] = []
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i]!
+    if (entry.length <= 3) continue
+    paths.push(entry.slice(3))
+    if (/[RC]/.test(entry.slice(0, 2))) i++
+  }
+  return paths
+}
 
 /** The part of `$` the reader uses: the engine's, or a test's. */
 export type GitDeps = {
@@ -79,7 +84,7 @@ export const makeGitReader = (ttlMs = TTL_MS) => {
         git('diff', '--shortstat', 'HEAD'),
         git('rev-list', '--left-right', '--count', '@{u}...HEAD'),
         // Read-only: never take the index lock while the person's own git runs.
-        git('--no-optional-locks', 'status', '--porcelain'),
+        git('--no-optional-locks', 'status', '--porcelain', '-z'),
       ])
       snap.branch = branch?.trim() || null
       Object.assign(snap, parseShortstat(shortstat ?? ''))

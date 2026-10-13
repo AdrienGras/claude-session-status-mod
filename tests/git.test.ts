@@ -23,13 +23,13 @@ test('ahead/behind from rev-list --left-right', () => {
   expect(parseAheadBehind('')).toBe(null)
 })
 
-test('porcelain paths, renames to their destination', () => {
-  expect(parsePorcelain(' M hooks/a.ts\n?? new.ts\nR  old.ts -> moved.ts\n M "with space.ts"\n')).toEqual([
-    'hooks/a.ts',
-    'new.ts',
-    'moved.ts',
-    'with space.ts',
-  ])
+test('porcelain -z paths, as written: renames to their destination, no quoting', () => {
+  // Real git 2.43 output: a rename (destination, then source), non-ASCII, quotes, an arrow in a name.
+  const out = 'R  mo -> ved.txt\0old.txt\0?? réunion.md\0?? with "q".txt\0 M hooks/a.ts\0'
+  expect(parsePorcelain(out)).toEqual(['mo -> ved.txt', 'réunion.md', 'with "q".txt', 'hooks/a.ts'])
+  expect(parsePorcelain('')).toEqual([])
+  // A rename in the worktree column (after `git add -N`) carries its source too.
+  expect(parsePorcelain(' R b.txt\0a.txt\0?? c.txt\0')).toEqual(['b.txt', 'c.txt'])
 })
 
 type Git = Record<string, { exitCode: number; stdout: string }>
@@ -69,7 +69,7 @@ test('in a repo without upstream: no ahead/behind; session files by mtime', asyn
       'rev-parse --show-toplevel': { exitCode: 0, stdout: '/work/x\n' },
       'branch --show-current': { exitCode: 0, stdout: 'main\n' },
       'diff --shortstat HEAD': { exitCode: 0, stdout: ' 2 files changed, 5 insertions(+), 1 deletion(-)\n' },
-      '--no-optional-locks status --porcelain': { exitCode: 0, stdout: ' M old.ts\n M fresh.ts\n' },
+      '--no-optional-locks status --porcelain -z': { exitCode: 0, stdout: ' M old.ts\0 M fresh.ts\0' },
     },
     { '/work/x/old.ts': 100, '/work/x/fresh.ts': 2_000 },
   )
@@ -108,7 +108,7 @@ test('status never takes the index lock', async () => {
   const run = d.process.run
   d.process.run = async (argv, init) => (seen.push(argv.join(' ')), run(argv, init))
   await makeGitReader()(d, 0)
-  expect(seen).toContain('git --no-optional-locks status --porcelain')
+  expect(seen).toContain('git --no-optional-locks status --porcelain -z')
 })
 
 test('in a linked worktree, git runs in the session folder and paths join its own top', async () => {
@@ -119,7 +119,7 @@ test('in a linked worktree, git runs in the session folder and paths join its ow
     {
       'rev-parse --show-toplevel': { exitCode: 0, stdout: '/work/wt\n' },
       'branch --show-current': { exitCode: 0, stdout: 'feature\n' },
-      '--no-optional-locks status --porcelain': { exitCode: 0, stdout: ' M edited.ts\n' },
+      '--no-optional-locks status --porcelain -z': { exitCode: 0, stdout: ' M edited.ts\0' },
     },
     { '/work/wt/edited.ts': 2_000 },
   )
