@@ -93,7 +93,8 @@ export const registerTracking = (on: On): void => {
   // import): it registers /sst too.
   on('session.start', async ($, e, next) => {
     const r = await next(e)
-    await $.command.register({ name: 'sst', description: STR.commandDescription })
+    // Immediate: the pane is most wanted while a turn runs; the answer only opens, closes or reads.
+    await $.command.register({ name: 'sst', description: STR.commandDescription, immediate: true })
     const model = await $.session.model()
     await update($, liveAtom, l => ({ ...l, model: l.model ?? model }))
     const stored = await $.store.get(SETTINGS_KEY)

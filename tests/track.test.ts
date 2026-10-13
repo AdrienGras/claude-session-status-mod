@@ -43,3 +43,9 @@ test('observing hooks hand back what is beneath unchanged', async ($, on) => {
   await startSession($)
   expect(await $.tool.call({ tool: 'Read', input: {}, tool_use_id: 'u2' } as never)).toEqual(beneath)
 })
+
+test('/sst runs at once, even while a turn is running', async ($, on) => {
+  const fake = fakeEngine(on)
+  await startSession($)
+  expect(fake.commandSpecs.find(c => c.name === 'sst')?.immediate).toBe(true)
+})

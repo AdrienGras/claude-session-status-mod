@@ -9,6 +9,7 @@ export type FakeEngine = {
   turns: number
   openPanes: Set<string>
   commands: string[]
+  commandSpecs: { name: string; immediate?: true }[]
   clock: MockClock
   usageCalls: unknown[]
   repo: { root: string; remote: string | null } | null
@@ -26,6 +27,7 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     turns: 0,
     openPanes: new Set(),
     commands: [],
+    commandSpecs: [],
     clock: mock.clock(on),
     usageCalls: [],
     repo: null,
@@ -34,7 +36,7 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
   on('session.cwd', () => ({ value: '/work/x' }))
   on('session.repo', () => ({ value: fake.repo && { ...fake.repo, internal: false, name: null } }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', (_$, e) => (fake.commands.push(e.name), { value: { command: e.name } }))
+  on('command.register', (_$, e) => (fake.commands.push(e.name), fake.commandSpecs.push(e), { value: { command: e.name } }))
   on('session.usage', (_$, e) => (fake.usageCalls.push(e), { value: fake.usage }))
   on('session.model', () => ({ value: fake.model }))
   on('session.turns', () => ({ value: fake.turns }))
