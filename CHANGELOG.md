@@ -4,6 +4,8 @@ All notable changes to this project are listed here. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-14
+
 ### Added
 
 - The Agents box in the side pane: a card per subagent, tracked live from spawn to end.
@@ -62,7 +64,8 @@ First release.
 - Settings pane (`/sst config`): pick, reorder and size the status line items.
 - `/sst debug`: what the mod sees, figures and categories only.
 
-[Unreleased]: https://github.com/AdrienGras/claude-session-status-mod/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AdrienGras/claude-session-status-mod/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/AdrienGras/claude-session-status-mod/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AdrienGras/claude-session-status-mod/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AdrienGras/claude-session-status-mod/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AdrienGras/claude-session-status-mod/releases/tag/v0.1.0
