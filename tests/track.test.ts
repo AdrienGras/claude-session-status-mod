@@ -52,9 +52,9 @@ test('/sst runs at once, even while a turn is running', async ($, on) => {
 })
 
 test('a refused spawn starts no subagent', async ($, on) => {
-  fakeEngine(on)
+  const fake = fakeEngine(on)
   on('turn.start', (_$, e) => ({ turnId: e.turnId }))
-  on('agent.spawn', () => ({ deny: 'not now' }) as never)
+  fake.spawnAnswer = { deny: 'not now' }
   await startSession($)
   await $.turn.start({ text: 'go', turnId: 'T1' })
   await $.agent.spawn({ prompt: 'x', agentType: 'general-purpose' } as never)

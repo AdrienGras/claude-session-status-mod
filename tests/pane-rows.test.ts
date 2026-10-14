@@ -3,6 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { cellWidth } from '../hooks/cells'
 import { fitLine, paneRows } from '../hooks/pane-rows'
 import type { PaneInput } from '../hooks/pane-rows'
+import type { AgentCard } from '../types'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE, emptyCounters } from '../hooks/state'
 
@@ -47,6 +48,7 @@ const input = (over: Partial<PaneInput> = {}): PaneInput => ({
   git: { cwd: '/srv/me/project', repo: 'me/project', branch: 'main', files: 3, added: 42, removed: 7, ahead: 2, behind: 0, sessionFiles: ['hooks/a.ts'] },
   settings: DEFAULT_SETTINGS,
   expanded: [],
+  agents: [],
   now: NOW,
   columns: 48,
   ...over,
@@ -215,4 +217,56 @@ test('with no figure at all the context box says when it comes', () => {
 test('a weekly reset names its day', () => {
   const t = box(input(), 'Quotas')!
   expect(t).toMatch(/resets [A-Z][a-z]{2} \d{1,2} \d\d:\d\d/)
+})
+
+const card = (over: Partial<AgentCard> = {}): AgentCard => ({
+  id: 'a1',
+  type: 'Explore',
+  task: 'find the auth code',
+  startedAt: NOW - 72_000,
+  endedAt: null,
+  state: 'running',
+  steps: 7,
+  contextTokens: 24_000,
+  outputTokens: 3_100,
+  calls: [],
+  ...over,
+})
+
+test('agents: one card per subagent, state and time in the row, figures under it', () => {
+  const done = card({ id: 'a2', type: 'Plan', task: 'plan it', startedAt: NOW - 60_000, endedAt: NOW - 12_000, state: 'done' })
+  const t = box(input({ agents: [done, card()] }), 'Agents')!
+  expect(t.split('\n')[0]).toContain('1 running')
+  expect(t).toContain('▸ Explore · find the auth code')
+  expect(t).toContain('● 1m12s')
+  expect(t).toContain('ctx 24k · 3.1k out · 7 steps')
+  expect(t).toContain('✓ 48s')
+  expect(t.indexOf('Explore')).toBeLessThan(t.indexOf('Plan'))
+})
+
+test('agents: unfolded, the last calls; none yet, said so', () => {
+  const calls = box(input({ agents: [card({ calls: [{ tool: 'Read', detail: '/w/a.ts' }] })], expanded: ['agent:a1'] }), 'Agents')!
+  expect(calls).toContain('Read')
+  expect(calls).toContain('/w/a.ts')
+  expect(box(input({ agents: [card()], expanded: ['agent:a1'] }), 'Agents')).toContain('no tool calls yet')
+  const unknown = box(input({ agents: [card({ contextTokens: null, steps: 0, outputTokens: 0 })] }), 'Agents')!
+  expect(unknown).toContain('0 out')
+  expect(unknown).not.toContain('ctx')
+})
+
+test('agents: an empty task leaves no dangling separator', () => {
+  const t = box(input({ agents: [card({ task: '' })] }), 'Agents')!
+  expect(t).toContain('▸ Explore')
+  expect(t).not.toContain('Explore ·')
+})
+
+test('agents: no subagent, no box', () => {
+  expect(box(input(), 'Agents')).toBeUndefined()
+})
+
+test('agents: wide glyphs and long tasks stay in the frame', () => {
+  const c = card({ task: `調査${'長いタスク'.repeat(40)}`, calls: [{ tool: 'Read', detail: 'ドキュメント/会議.md' }] })
+  for (const columns of [48, 60]) {
+    for (const r of all(input({ columns, agents: [c], expanded: ['agent:a1'] }))) expect(cellWidth(r)).toBe(columns)
+  }
 })

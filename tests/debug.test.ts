@@ -1,6 +1,7 @@
 import type { SessionUsage } from 'claude-code'
 import { expect, test } from 'claude-code/testing'
 
+import type { AgentCard } from '../types'
 import { debugReport } from '../hooks/debug'
 import { DEFAULT_SETTINGS } from '../hooks/settings'
 import { EMPTY_LIVE, emptyCounters } from '../hooks/state'
@@ -42,6 +43,7 @@ const mod = {
     sessionFiles: ['private/notes.md'],
   },
   settings: DEFAULT_SETTINGS,
+  agents: [] as AgentCard[],
 }
 
 test('the debug report carries no path, server, agent, skill, repo or branch name', () => {
@@ -69,4 +71,13 @@ test('a configured model id that is no Claude model name is not printed', () => 
   expect(debugReport(usage, mod).mod.live.model).toBe('claude-opus-5-5')
   const bedrock = { ...mod, live: { ...mod.live, model: 'eu.anthropic.claude-opus-5-5-v1:0' } }
   expect(debugReport(usage, bedrock).mod.live.model).toBe('claude-opus-5-5-v1')
+})
+
+test('the debug report counts subagents, never their task or calls', () => {
+  const card = (id: string, state: AgentCard['state']) =>
+    ({ id, type: 'Explore', task: 'secret-task', state, calls: [{ tool: 'Read', detail: '/home/alice/x' }] }) as unknown as AgentCard
+  const r = debugReport(usage, { ...mod, agents: [card('a', 'running'), card('b', 'done')] })
+  expect(r.mod.agents).toEqual({ running: 1, finished: 1 })
+  const text = JSON.stringify(r)
+  for (const secret of ['secret-task', 'alice', 'Explore']) expect(text).not.toContain(secret)
 })

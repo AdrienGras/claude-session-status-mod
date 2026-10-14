@@ -2,9 +2,9 @@
 // public issues, so nothing local passes: no path, server, agent, skill, repo or branch name.
 import type { SessionUsage } from 'claude-code'
 
-import type { Counters, GitSnapshot, Live, Receipt, Settings } from '../types'
+import type { AgentCard, Counters, GitSnapshot, Live, Receipt, Settings } from '../types'
 
-type ModState = { live: Live; counters: Counters; receipt: Receipt | null; git: GitSnapshot | null; settings: Settings }
+type ModState = { live: Live; counters: Counters; receipt: Receipt | null; git: GitSnapshot | null; settings: Settings; agents: AgentCard[] }
 
 /**
  * The Claude model name inside a model id, or `other`: a configured id can be a cloud ARN or a
@@ -54,6 +54,7 @@ export const debugReport = (usage: SessionUsage, mod: ModState) => {
         sessionFiles: g.sessionFiles.length,
       },
       settings: mod.settings,
+      agents: { running: mod.agents.filter(a => a.state === 'running').length, finished: mod.agents.filter(a => a.state !== 'running').length },
     },
   }
 }

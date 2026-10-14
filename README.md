@@ -54,6 +54,7 @@ Want more? The **7d window**, **session cost** and **branch & diff** are one `/s
 | 📦 **Context** | the bar and its four biggest categories (the rest as *other*), room left before auto-compaction, unfoldable lists of memory files, MCP servers and agents |
 | 🔥 **Quotas** | every window your plan reports: 5h and 7d with used share, projection, verdict, time to reset and when it resets; a spend limit as a plain gauge |
 | 💸 **Session** | cost, per hour and per prompt, duration, prompts, compactions, tool calls by tool, subagents, and a receipt of the last turn |
+| 🤖 **Agents** | a card per subagent, live from spawn to end: type, task, state (running, done, failed, stopped), time, tokens and its last tool calls; the last three finished ones stay |
 | 🌿 **Repo** | folder, `owner/repo`, branch, `+added −removed`, ahead/behind upstream, files you changed during this session |
 
 At the bottom: **compact** runs `/compact` (after asking 🙏), **recount** counts the context exactly like `/context`, **settings** opens the settings.

@@ -17,6 +17,10 @@ export type FakeEngine = {
   /** Usage reads refused before the next one answers (an engine not ready yet). */
   usageFailures: number
   repo: { root: string; remote: string | null } | null
+  /** What `agent.list` answers. */
+  agents: { id: string; status: string; description: string; type: string }[]
+  /** What `agent.spawn` answers. */
+  spawnAnswer: { model?: string; agentId?: string; deny?: string }
 }
 
 export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine => {
@@ -37,6 +41,8 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     usageCalls: [],
     usageFailures: 0,
     repo: null,
+    agents: [],
+    spawnAnswer: { model: 'claude-haiku-5-5', agentId: 'a1' },
   }
   mock.store(on)
   on('session.cwd', () => ({ value: '/work/x' }))
@@ -55,6 +61,8 @@ export const fakeEngine = (on: On, usage?: Partial<SessionUsage>): FakeEngine =>
     }
     return { value: fake.usage }
   })
+  on('agent.list', () => ({ value: fake.agents as never }))
+  on('agent.spawn', () => fake.spawnAnswer as never)
   on('session.model', () => ({ value: fake.model }))
   on('session.turns', () => ({ value: fake.turns }))
   on('ui.open', (_$, e) => {

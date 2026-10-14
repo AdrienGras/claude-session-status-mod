@@ -2,13 +2,14 @@
 import type { EngineInterface, On } from 'claude-code'
 import { atom, read, update } from 'claude-code'
 
+import { keepCards, reconcile, spawnCard, stepCard, callCard, endCard, withCard } from './agents'
 import { toBreakdownView } from './context'
 import { makeGitReader } from './git'
 import { stepSpeed } from './session'
 import { normalizeSettings, SETTINGS_KEY } from './settings'
 import { EMPTY_LIVE, emptyCounters, INITIAL_SETTINGS } from './state'
 import { S as STR } from './strings'
-import type { GitSnapshot, Receipt, UsageView } from '../types'
+import type { AgentCard, GitSnapshot, Receipt, UsageView } from '../types'
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit'])
 
@@ -19,6 +20,7 @@ const liveAtom = atom({ plugin: 'session-status', key: 'live' } as const, EMPTY_
 const countersAtom = atom({ plugin: 'session-status', key: 'counters' } as const, emptyCounters(0))
 const receiptAtom = atom({ plugin: 'session-status', key: 'receipt' } as const, null as Receipt | null)
 const gitAtom = atom({ plugin: 'session-status', key: 'git' } as const, null as GitSnapshot | null)
+const agentsAtom = atom({ plugin: 'session-status', key: 'agents' } as const, [] as AgentCard[])
 const settingsAtom = atom({ plugin: 'session-status', key: 'settings' } as const, INITIAL_SETTINGS)
 
 const gitReader = makeGitReader()
@@ -45,7 +47,42 @@ const REDRAW_MS = 30_000
 let redraw: { cancel: () => void } | null = null
 /** While a turn runs, its timer in the pane counts seconds. */
 const TICK_MS = 1_000
+/** Every this many ticks, the agent list is read again: a killed agent raises no end of its own. */
+const RECONCILE_TICKS = 5
 let tick: { cancel: () => void } | null = null
+
+/** The one-second tick runs while a main turn or a subagent card runs, and rests otherwise. */
+const syncTick = async ($: Dollar) => {
+  const isBusy = (await read($, liveAtom)).isWorking || (await read($, agentsAtom)).some(c => c.state === 'running')
+  if (isBusy && !tick) {
+    let ticks = 0
+    tick = $.clock.every(TICK_MS, () => {
+      ticks += 1
+      if (ticks % RECONCILE_TICKS === 0) void reconcileAgents($).catch(() => undefined)
+      return $.ui.invalidate('ui.render')
+    })
+  }
+  else if (!isBusy && tick) {
+    tick.cancel()
+    tick = null
+  }
+}
+
+/** Ends the cards of agents the engine no longer reports running (a killed one raises no end). */
+const reconcileAgents = async ($: Dollar) => {
+  if (!(await read($, agentsAtom)).some(c => c.state === 'running')) return
+  const listed = await $.agent.list().catch(() => null)
+  if (!listed) return
+  const now = await $.clock.now()
+  await update($, agentsAtom, cs => keepCards(reconcile(cs, listed, now)))
+  await syncTick($)
+}
+
+/** Changes one card; an agent the mod holds no card for writes nothing. */
+const changeCard = async ($: Dollar, id: string, change: (c: AgentCard) => AgentCard) => {
+  if (!(await read($, agentsAtom)).some(c => c.id === id)) return
+  await update($, agentsAtom, cs => keepCards(withCard(cs, id, change)))
+}
 
 /** Re-read the session's figures; a new `startedAt` the mod did not see coming starts the counts over. */
 const refreshUsage = async ($: Dollar) => {
@@ -85,6 +122,7 @@ const refreshLater = ($: Dollar, finish?: (view: UsageView) => Promise<void>) =>
     void (async () => {
       const view = await refreshUsage($)
       if (finish) await finish(view)
+      await reconcileAgents($).catch(() => undefined)
       const snap = await readGit($, view.startedAt)
       await update($, gitAtom, () => snap)
     })()
@@ -113,6 +151,7 @@ export const registerTracking = (on: On): void => {
     // A fresh process starts counting; a reloaded module keeps the counts of this session. A read
     // refused this early is tried again just after.
     await refreshUsage($).catch(() => undefined)
+    await syncTick($)
     refreshLater($)
     return r
   })
@@ -125,9 +164,9 @@ export const registerTracking = (on: On): void => {
     isCountReset = true
     await update($, countersAtom, () => emptyCounters(now))
     await update($, receiptAtom, () => null)
-    tick?.cancel()
-    tick = null
+    await update($, agentsAtom, () => [])
     await update($, liveAtom, l => ({ ...l, requests: 0, speed: null, isWorking: false }))
+    await syncTick($)
     // The old conversation's fill and cost no longer hold; the next figures bring the new ones.
     await update($, usageAtom, u => u && { ...u, tokens: undefined, costUsd: undefined, prompts: 0, breakdown: null })
     // The old conversation's files are not this one's.
@@ -147,7 +186,12 @@ export const registerTracking = (on: On): void => {
   })
 
   on('turn.step', async function* ($, e, next) {
-    if (e.agentId) return yield* next(e)
+    if (e.agentId) {
+      const agentId = e.agentId
+      const sub = yield* next(e)
+      await changeCard($, agentId, c => stepCard(c, sub.usage ?? null))
+      return sub
+    }
     await update($, liveAtom, l => ({
       ...l,
       model: e.model,
@@ -181,18 +225,21 @@ export const registerTracking = (on: On): void => {
     costAtTurnStart = (await read($, usageAtom))?.costUsd
     await update($, liveAtom, l => ({ ...l, isWorking: true }))
     await update($, receiptAtom, () => ({ isRunning: true, startedAt: now, durationMs: null, agents: 0, edits: 0, errors: 0, costAddedUsd: null }))
-    tick?.cancel()
-    tick = $.clock.every(TICK_MS, () => $.ui.invalidate('ui.render'))
+    await syncTick($)
     return next(e)
   })
 
   on('turn.complete', async ($, e, next) => {
     const r = await next(e)
-    if (e.agentId) return r
-    tick?.cancel()
-    tick = null
     const now = await $.clock.now()
+    if (e.agentId) {
+      const agentId = e.agentId
+      await changeCard($, agentId, c => endCard(c, e, now))
+      await syncTick($)
+      return r
+    }
     await update($, liveAtom, l => ({ ...l, isWorking: false }))
+    await syncTick($)
     await update($, receiptAtom, rc => rc && { ...rc, isRunning: false, durationMs: now - rc.startedAt })
     // The figures and git come after the turn is handed back, never holding it.
     const costBefore = costAtTurnStart
@@ -220,6 +267,8 @@ export const registerTracking = (on: On): void => {
   })
 
   on('tool.call', async ($, e, next) => {
+    // A subagent's call is on its card before the tool runs: a long one shows while it works.
+    if (e.agentId) await changeCard($, e.agentId, c => callCard(c, e.tool, e))
     const r = await next(e)
     const isError = 'deny' in r ? true : r.isError === true
     await update($, countersAtom, c => ({ ...c, tools: { ...c.tools, [e.tool]: (c.tools[e.tool] ?? 0) + 1 } }))
@@ -236,6 +285,12 @@ export const registerTracking = (on: On): void => {
     if (r.deny === undefined) {
       await update($, countersAtom, c => ({ ...c, subagents: c.subagents + 1 }))
       await update($, receiptAtom, rc => (rc?.isRunning ? { ...rc, agents: rc.agents + 1 } : rc))
+      // A teammate lives in its own terminal pane and raises no end here: no card.
+      if (r.agentId && !e.isTeammate) {
+        const card = spawnCard(r.agentId, e.subagentType, e.description, await $.clock.now())
+        await update($, agentsAtom, cs => keepCards([...cs, card]))
+        await syncTick($)
+      }
     }
     return r
   })
